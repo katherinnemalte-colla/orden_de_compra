@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solicitud de Compra</title>
+<link rel="stylesheet" href="/static/css/solicitud_compra.css">
+</head>
+<body>
+<div class="win">
+<div class="titlebar">🛒 Requerimiento de Materia Prima Carnica a Proveedores</div>
+<h1>Solicitud de Compra</h1>
+
+<div class="toolbar">
+  <a class="btn" href="/">← Volver</a>
+  <form class="nav" method="get" action="/">
+    <select class="btn" name="campo" aria-label="Buscar por">
+      {% for k, nombre in campos.items() %}<option value="{{ k }}"{{ " selected" if k == campo }}>{{ nombre }}</option>{% endfor %}
+    </select>
+    <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.first }}" aria-label="Primero">⏮</a>
+    <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.prev }}" aria-label="Anterior">◀</a>
+    <input class="btn num" name="valor" value="{{ valor }}" inputmode="numeric" aria-label="Valor a buscar">
+    <button class="btn" type="submit" aria-label="Buscar">🔍</button>
+    <a class="btn{{ ' dis' if nav.fin }}" href="{{ nav.next }}" aria-label="Siguiente">▶</a>
+    <a class="btn{{ ' dis' if nav.fin }}" href="{{ nav.last }}" aria-label="Último">⏭</a>
+    <span class="cnt">{{ contador }}</span>
+  </form>
+  <span class="sp"></span>
+  <a class="btn" href="{{ nav.actual }}" aria-label="Actualizar">⟳</a>
+  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Nuevo">＋</button>
+  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar">✎</button>
+  <button class="btn" onclick="window.print()" aria-label="Imprimir">🖨</button>
+  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Configuración">⚙</button>
+</div>
+
+{% if mensaje %}<div class="msg" role="alert">{{ mensaje }}</div>{% endif %}
+
+<div class="main">
+  <div class="card">
+    <div class="form">
+      <div class="f c3"><label>Estado</label><input class="estado e{{ c.estdo }}" value="{{ c.estado }}" readonly></div>
+      <div class="f c4"><label>Proveedor</label><input value="{{ c.prov }}" readonly></div>
+      <div class="f c3"><label>Fecha Pedido</label><input type="date" value="{{ c.fped }}" readonly></div>
+      <div class="f c2"><label>Fecha Pactada</label><input type="date" value="{{ c.fpac }}" readonly></div>
+
+      <div class="f c3"><label>Tipo Pedido</label>
+        <div class="radio"><label><input type="radio" disabled style="width:auto;min-height:0"{{ " checked" if c and not c.internacional }}>Nacional</label><label><input type="radio" disabled style="width:auto;min-height:0"{{ " checked" if c and c.internacional }}>Internacional</label></div></div>
+      <div class="f c4"><label>Orden de Compra</label><input value="{{ c.oc }}" readonly></div>
+      <div class="f c3"><label>Lote Int.</label><input value="{{ c.lote }}" placeholder="—" readonly></div>
+      <div class="f c2"><label>TRM</label><input class="num" value="{{ c.trm | fmt if c else '' }}" readonly></div>
+
+      <div class="f c3"><label>Cod. Plu</label><input value="{{ sel.plu }}" readonly></div>
+      <div class="f c4"><label>Nombre del producto</label><input value="{{ sel.nombre }}" readonly></div>
+      <div class="f c3"><label>Nivel Destino</label><input value="{{ sel.nivel }}" readonly></div>
+      <div class="f c2"><label>Precio Compra</label><input class="num" value="{{ sel.precio | fmt if sel else '' }}" readonly></div>
+      <div class="f c2"><label>Precio US</label><input class="num" value="{{ sel.us | fmt if sel else '' }}" readonly></div>
+
+      <div class="f c5"><label>Bodega destino</label><input value="{{ c.bod }}" readonly></div>
+      <div class="f c5"><label class="reg">REGISTRADO POR</label><input value="{{ c.reg }}" readonly></div>
+
+      <div class="f c6"><label style="display:flex;justify-content:space-between">Descripcion <span class="cnt">0/255 caracteres</span></label>
+        <textarea rows="3" placeholder="Descripción del requerimiento..." readonly></textarea></div>
+      <div class="f c6"><label>Note</label><textarea rows="3" placeholder="Notas adicionales..." readonly></textarea></div>
+    </div>
+  </div>
+
+  <aside class="card side">
+    <h2>Resumen del Pedido</h2>
+    <div class="kv"><span><i class="dot" style="background:#4cb5a3"></i>Profit</span><b class="num">0</b></div>
+    <div class="kv"><span><i class="dot" style="background:var(--brand2)"></i>Cost</span><b class="num">{{ cost | fmt }}</b></div>
+    <div class="kv"><span>Margin</span><b>{{ margin }}%</b></div>
+    <div class="sub">Participación por producto</div>
+    <div class="bars">
+      {% for b in bars %}<div class="bar"><span title="{{ b.full }}">{{ b.plu }} · {{ b.corto }}…</span><progress value="{{ b.pct }}" max="100">{{ b.pct }}%</progress><span>{{ b.pct }}%</span></div>{% endfor %}
+    </div>
+    <div class="sub">Avance del pedido</div>
+    <div class="steps">
+      {% for s in steps %}<div class="st {{ s.cls }}"><b></b>{{ s.t }}<small>{{ s.s }}</small></div>{% endfor %}
+    </div>
+    <div class="tot">
+      <div class="kv"><span>Orden total</span><span class="v">{{ total_iva | fmt }} COP</span></div>
+      <div class="kv"><span>VAT taxable total</span><span class="v">{{ cost | fmt }} COP</span></div>
+    </div>
+  </aside>
+</div>
+
+<div class="card grid">
+  <div class="gtools">
+    <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Exportar">⇱</button>
+    <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar líneas">✎</button>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>plu</th><th>Nombre del producto</th><th class="r">Bodega Destino</th><th>Nivel</th><th class="r">Cantidad</th><th class="r">Precio sin iva</th><th class="r">Precio US SIN IVA</th></tr></thead>
+      <tbody>
+        {% for ln in lineas %}
+        <tr class="{{ 'sel' if ln.sel }}">
+          <td><a class="fila" href="{{ ln.url }}">{{ ln.plu }}</a></td><td>{{ ln.nombre }}</td>
+          <td class="r">{{ ln.bod }}</td><td>{{ ln.nivel }}</td>
+          <td class="r">{{ ln.qty | fmt }}</td><td class="r">{{ ln.precio | fmt }}</td><td class="r">{{ ln.us | fmt }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty"><td colspan="7">Sin productos para mostrar.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="foot">
+  <div class="vat">VAT taxable total <b>{{ cost | fmt }} COP</b></div>
+  <button class="btn primary" disabled title="Disponible en la siguiente etapa">🚚 Create shipment</button>
+</div>
+</div>
+</body>
+</html>
