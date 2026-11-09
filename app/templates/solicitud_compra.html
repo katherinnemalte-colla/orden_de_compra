@@ -95,9 +95,9 @@
       <tbody>
         {% for ln in lineas %}
         <tr class="{{ 'sel' if ln.sel }}">
-          <td><a class="fila" href="{{ ln.url }}">{{ ln.plu }}</a></td><td>{{ ln.nombre }}</td>
-          <td class="r">{{ ln.bod }}</td><td>{{ ln.nivel }}</td>
-          <td class="r">{{ ln.qty | fmt }}</td><td class="r">{{ ln.precio | fmt }}</td><td class="r">{{ ln.us | fmt }}</td>
+          <td data-label="plu"><a class="fila" href="{{ ln.url }}">{{ ln.plu }}</a></td><td data-label="Nombre del producto">{{ ln.nombre }}</td>
+          <td class="r" data-label="Bodega Destino">{{ ln.bod }}</td><td data-label="Nivel">{{ ln.nivel }}</td>
+          <td class="r" data-label="Cantidad">{{ ln.qty | fmt }}</td><td class="r" data-label="Precio sin iva">{{ ln.precio | fmt }}</td><td class="r" data-label="Precio US SIN IVA">{{ ln.us | fmt }}</td>
         </tr>
         {% else %}
         <tr class="empty"><td colspan="7">Sin productos para mostrar.</td></tr>
