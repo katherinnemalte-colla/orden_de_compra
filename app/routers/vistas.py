@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 from app.plantillas import templates
-from app.repos import pedidos
+from app.repos import pedidos_repository
 
 router = APIRouter(include_in_schema=False)
 
@@ -40,13 +40,13 @@ def inicio(request: Request, campo: str = "numero_pedido", valor: str = "", i: i
     if valor and not valor.isdigit():
         return responder(_base(campo, valor, "Ingresa solo números."))
 
-    numeros = pedidos.buscar_numeros(**({campo: int(valor)} if valor else {}))
+    numeros = pedidos_repository.buscar_numeros(**({campo: int(valor)} if valor else {}))
     if not numeros:
         return responder(_base(campo, valor, "No se encontró información para mostrar."))
 
     idx = i if i is not None else (0 if valor else len(numeros) - 1)
     idx = max(0, min(len(numeros) - 1, idx))
-    datos = pedidos.cargar_pedido(numeros[idx])
+    datos = pedidos_repository.cargar_pedido(numeros[idx])
     if datos is None:
         return responder(_base(campo, valor, "No se encontró información para mostrar."))
 

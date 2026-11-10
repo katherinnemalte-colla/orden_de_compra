@@ -2,7 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException
 
-from app.repos import pedidos
+from app.repos import pedidos_repository
 
 router = APIRouter(prefix="/api/pedidos", tags=["pedidos"])
 
@@ -17,7 +17,7 @@ def buscar(
     lote_int: int | None = None,
     orden_compra: int | None = None,
 ):
-    numeros = pedidos.buscar_numeros(
+    numeros = pedidos_repository.buscar_numeros(
         numero_pedido, proveedor, fecha_pactada, fecha_pedido,
         solo_pendientes, lote_int, orden_compra,
     )
@@ -26,7 +26,7 @@ def buscar(
 
 @router.get("/{numero_pedido}")
 def obtener(numero_pedido: int):
-    datos = pedidos.cargar_pedido(numero_pedido)
+    datos = pedidos_repository.cargar_pedido(numero_pedido)
     if datos is None:
         raise HTTPException(status_code=404, detail="No se encontró información para mostrar.")
     return datos

@@ -26,11 +26,41 @@
     <span class="cnt">{{ contador }}</span>
   </form>
   <span class="sp"></span>
-  <a class="btn" href="{{ nav.actual }}" aria-label="Actualizar">⟳</a>
-  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Nuevo">＋</button>
-  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar">✎</button>
-  <button class="btn" onclick="window.print()" aria-label="Imprimir">🖨</button>
-  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Configuración">⚙</button>
+  <a class="btn" href="{{ nav.actual }}" aria-label="Actualizar" title="Actualizar">
+    <img
+        src="https://cdn-icons-png.flaticon.com/512/3580/3580304.png"
+        alt="Actualizar"
+        class="icono-btn"
+    >
+  </a>
+  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Nuevo">
+    <img
+    src="https://cdn-icons-png.flaticon.com/512/10608/10608883.png"
+    alt="Agregar"
+    class="icono-btn"
+    >
+  </button>
+  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar">
+    <img
+        src="https://cdn-icons-png.flaticon.com/512/9196/9196327.png"
+        alt="Editar"
+        class="icono-btn"
+    >
+  </button>
+  <button class="btn" onclick="window.print()" aria-label="Imprimir" title="Imprimir">
+    <img 
+        src="https://cdn-icons-png.flaticon.com/512/7138/7138143.png"
+        alt="Imprimir"
+        class="icono-btn"
+    >
+  </button>
+  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Configuración">
+    <img
+        src="https://cdn-icons-png.flaticon.com/512/1827/1827766.png"
+        alt="Configuración"
+        class="icono-btn"
+    >
+  </button>
 </div>
 
 {% if mensaje %}<div class="msg" role="alert">{{ mensaje }}</div>{% endif %}

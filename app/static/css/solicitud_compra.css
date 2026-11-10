@@ -335,20 +335,28 @@ textarea:focus-visible {
 .bars {
   display: flex;
   flex-direction: column;
-  gap: 7px
+  gap: 12px
 }
 
 .bar {
   display: grid;
-  grid-template-columns: 96px 1fr 42px;
-  gap: 8px;
+  grid-template-columns: 1fr 42px;
+  grid-template-rows: auto auto;
+  gap: 5px 8px;
   align-items: center;
   font-size: 12px
 }
 
+.bar progress {
+  grid-column: 1;
+  width: 100%;
+}
+.bar span:first-child {
+  grid-column: 1 / -1;
+}
 .bar span:last-child {
+  grid-column: 2;
   text-align: right;
-  font-variant-numeric: tabular-nums
 }
 
 .steps {
@@ -617,7 +625,12 @@ td a.fila::after {
   background: var(--brand);
   border-radius: 5px
 }
-
+.icono-btn {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    vertical-align: middle;
+}
 /* ---------- Móvil ---------- */
 html {
   -webkit-text-size-adjust: 100%
@@ -821,4 +834,5 @@ html {
   .foot .btn {
     width: 100%
   }
+
 }
