@@ -33,13 +33,19 @@
         class="icono-btn"
     >
   </a>
-  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Nuevo">
-    <img
-    src="https://cdn-icons-png.flaticon.com/512/10608/10608883.png"
-    alt="Agregar"
-    class="icono-btn"
-    >
-  </button>
+
+  <form method="get" action="/api/pedidos/nuevo" style="display:inline">
+    <button class="btn" type="submit"
+            title="Crear nueva solicitud"
+            aria-label="Nuevo">
+        <img
+            src="https://cdn-icons-png.flaticon.com/512/10608/10608883.png"
+            alt="Agregar"
+            class="icono-btn"
+        >
+    </button>
+  </form>
+
   <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar">
     <img
         src="https://cdn-icons-png.flaticon.com/512/9196/9196327.png"
@@ -69,7 +75,20 @@
   <div class="card">
     <div class="form">
       <div class="f c3"><label>Estado</label><input class="estado e{{ c.estdo }}" value="{{ c.estado }}" readonly></div>
-      <div class="f c4"><label>Proveedor</label><input value="{{ c.prov }}" readonly></div>
+      
+      <div class="f c4">
+      <label>Proveedor</label>
+      <select name="proveedor" id="proveedor">
+          <option value="">Seleccione un proveedor</option>
+
+          {% for proveedor in proveedores %}
+              <option value="{{ proveedor.valor }}"
+                  {% if c.prov|string == proveedor.valor|string %}selected{% endif %}>
+                  {{ proveedor.texto }}
+              </option>
+          {% endfor %}
+      </select>
+      </div>
       <div class="f c3"><label>Fecha Pedido</label><input type="date" value="{{ c.fped }}" readonly></div>
       <div class="f c2"><label>Fecha Pactada</label><input type="date" value="{{ c.fpac }}" readonly></div>
 
@@ -82,6 +101,19 @@
       <div class="f c3"><label>Cod. Plu</label><input value="{{ sel.plu }}" readonly></div>
       <div class="f c4"><label>Nombre del producto</label><input value="{{ sel.nombre }}" readonly></div>
       <div class="f c3"><label>Nivel Destino</label><input value="{{ sel.nivel }}" readonly></div>
+      <div class="f c3">
+    <label>Nivel Destino</label>
+    <select name="nivel" id="nivel">
+        <option value="">Seleccione un nivel</option>
+
+        {% for nivel in niveles %}
+            <option value="{{ nivel.valor }}"
+                {% if sel.nivel|string == nivel.valor|string %}selected{% endif %}>
+                {{ nivel.texto }}
+            </option>
+        {% endfor %}
+    </select>
+</div>
       <div class="f c2"><label>Precio Compra</label><input class="num" value="{{ sel.precio | fmt if sel else '' }}" readonly></div>
       <div class="f c2"><label>Precio US</label><input class="num" value="{{ sel.us | fmt if sel else '' }}" readonly></div>
 

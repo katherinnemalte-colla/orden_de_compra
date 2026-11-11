@@ -1,8 +1,11 @@
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse
 
+from app.plantillas import templates
 from app.repos import pedidos_repository
+from app.services import pedidos_service
 
 router = APIRouter(prefix="/api/pedidos", tags=["pedidos"])
 
@@ -23,6 +26,47 @@ def buscar(
     )
     return {"total": len(numeros), "pedidos": numeros}
 
+# ---------- NUEVO PEDIDO ----------
+@router.get("/nuevo", response_class=HTMLResponse)
+def nuevo(request: Request):
+
+    ctx = {
+        "campos": {
+            "numero_pedido": "Pedido No",
+            "proveedor": "Proveedor",
+            "orden_compra": "Orden de Compra",
+        },
+        "campo": "numero_pedido",
+        "valor": "",
+        "mensaje": None,
+        "c": {},
+        "sel": {},
+        "lineas": [],
+        "bars": [],
+        "steps": [],
+        "cost": 0,
+        "total_iva": 0,
+        "margin": 0,
+        "contador": "",
+        "nav": {
+            "first": "#",
+            "prev": "#",
+            "next": "#",
+            "last": "#",
+            "actual": "/",
+            "ini": True,
+            "fin": True,
+        },
+    }
+
+    datos = pedidos_service.PedidosService.preparar_nuevo()
+    ctx.update(datos)
+
+    return templates.TemplateResponse(
+        request,
+        "solicitud_compra.html",
+        ctx
+    )
 
 @router.get("/{numero_pedido}")
 def obtener(numero_pedido: int):
