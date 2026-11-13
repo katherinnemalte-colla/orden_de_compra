@@ -1,178 +1,390 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Solicitud de Compra</title>
-<link rel="stylesheet" href="/static/css/solicitud_compra.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Solicitud de Compra</title>
+  <link rel="stylesheet" href="/static/css/solicitud_compra.css">
 </head>
+
 <body>
-<div class="win">
-<div class="titlebar">🛒 Requerimiento de Materia Prima Carnica a Proveedores</div>
-<h1>Solicitud de Compra</h1>
+  <div class="win">
 
-<div class="toolbar">
-  <a class="btn" href="/">← Volver</a>
-  <form class="nav" method="get" action="/">
-    <select class="btn" name="campo" aria-label="Buscar por">
-      {% for k, nombre in campos.items() %}<option value="{{ k }}"{{ " selected" if k == campo }}>{{ nombre }}</option>{% endfor %}
-    </select>
-    <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.first }}" aria-label="Primero">⏮</a>
-    <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.prev }}" aria-label="Anterior">◀</a>
-    <input class="btn num" name="valor" value="{{ valor }}" inputmode="numeric" aria-label="Valor a buscar">
-    <button class="btn" type="submit" aria-label="Buscar">🔍</button>
-    <a class="btn{{ ' dis' if nav.fin }}" href="{{ nav.next }}" aria-label="Siguiente">▶</a>
-    <a class="btn{{ ' dis' if nav.fin }}" href="{{ nav.last }}" aria-label="Último">⏭</a>
-    <span class="cnt">{{ contador }}</span>
-  </form>
-  <span class="sp"></span>
-  <a class="btn" href="{{ nav.actual }}" aria-label="Actualizar" title="Actualizar">
-    <img
-        src="https://cdn-icons-png.flaticon.com/512/3580/3580304.png"
-        alt="Actualizar"
-        class="icono-btn"
-    >
-  </a>
+    <div class="titlebar">🛒 Requerimiento de Materia Prima Carnica a Proveedores</div>
+    <h1>Solicitud de Compra</h1>
 
-  <form method="get" action="/api/pedidos/nuevo" style="display:inline">
-    <button class="btn" type="submit"
-            title="Crear nueva solicitud"
-            aria-label="Nuevo">
-        <img
-            src="https://cdn-icons-png.flaticon.com/512/10608/10608883.png"
-            alt="Agregar"
-            class="icono-btn"
-        >
-    </button>
-  </form>
+    <div class="toolbar">
 
-  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar">
-    <img
-        src="https://cdn-icons-png.flaticon.com/512/9196/9196327.png"
-        alt="Editar"
-        class="icono-btn"
-    >
-  </button>
-  <button class="btn" onclick="window.print()" aria-label="Imprimir" title="Imprimir">
-    <img 
-        src="https://cdn-icons-png.flaticon.com/512/7138/7138143.png"
-        alt="Imprimir"
-        class="icono-btn"
-    >
-  </button>
-  <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Configuración">
-    <img
-        src="https://cdn-icons-png.flaticon.com/512/1827/1827766.png"
-        alt="Configuración"
-        class="icono-btn"
-    >
-  </button>
-</div>
+      <a class="btn" href="/">← Volver</a>
 
-{% if mensaje %}<div class="msg" role="alert">{{ mensaje }}</div>{% endif %}
-
-<div class="main">
-  <div class="card">
-    <div class="form">
-      <div class="f c3"><label>Estado</label><input class="estado e{{ c.estdo }}" value="{{ c.estado }}" readonly></div>
-      
-      <div class="f c4">
-      <label>Proveedor</label>
-      <select name="proveedor" id="proveedor">
-          <option value="">Seleccione un proveedor</option>
-
-          {% for proveedor in proveedores %}
-              <option value="{{ proveedor.valor }}"
-                  {% if c.prov|string == proveedor.valor|string %}selected{% endif %}>
-                  {{ proveedor.texto }}
-              </option>
+      {% if modo == "consulta" %}
+      <form class="nav" method="get" action="/">
+        <select class="btn" name="campo" aria-label="Buscar por">
+          {% for k, nombre in campos.items() %}
+          <option value="{{ k }}" {% if k==campo %}selected{% endif %}>
+            {{ nombre }}
+          </option>
           {% endfor %}
-      </select>
+        </select>
+
+        <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.first }}" aria-label="Primero">⏮</a>
+        <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.prev }}" aria-label="Anterior">◀</a>
+
+        <input class="btn num" name="valor" value="{{ valor }}" inputmode="numeric" aria-label="Valor a buscar">
+
+        <button class="btn" type="submit" aria-label="Buscar">🔍</button>
+
+        <a class="btn{{ ' dis' if nav.fin }}" href="{{ nav.next }}" aria-label="Siguiente">▶</a>
+        <a class="btn{{ ' dis' if nav.fin }}" href="{{ nav.last }}" aria-label="Último">⏭</a>
+
+        <span class="cnt">{{ contador }}</span>
+      </form>
+      {% endif %}
+
+      <span class="sp"></span>
+
+      {% if modo == "consulta" %}
+      <a class="btn" href="{{ nav.actual }}" aria-label="Actualizar" title="Actualizar">
+        <img src="https://cdn-icons-png.flaticon.com/512/3580/3580304.png" alt="Actualizar" class="icono-btn">
+      </a>
+      {% endif %}
+
+      <a class="btn" href="/nuevo" title="Crear nueva solicitud" aria-label="Nuevo">
+        <img src="https://cdn-icons-png.flaticon.com/512/10608/10608883.png" alt="Agregar" class="icono-btn">
+      </a>
+
+      <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar">
+        <img src="https://cdn-icons-png.flaticon.com/512/9196/9196327.png" alt="Editar" class="icono-btn">
+      </button>
+
+      <button class="btn" onclick="window.print()" aria-label="Imprimir" title="Imprimir">
+        <img src="https://cdn-icons-png.flaticon.com/512/7138/7138143.png" alt="Imprimir" class="icono-btn">
+      </button>
+
+      <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Configuración">
+        <img src="https://cdn-icons-png.flaticon.com/512/1827/1827766.png" alt="Configuración" class="icono-btn">
+      </button>
+
+    </div>
+
+    {% if mensaje %}
+    <div class="msg" role="alert">{{ mensaje }}</div>
+    {% endif %}
+
+    <div class="main">
+
+      <div class="card">
+
+        <div class="form">
+
+          <!-- Estado -->
+          <div class="f c3">
+            <label>Estado</label>
+            <input class="estado e{{ c.estdo }}" value="{{ c.estado }}" readonly>
+          </div>
+          
+          <!-- Proveedor -->
+          <div class="f c4">
+            <label>Proveedor</label>
+            <select name="proveedor"
+                  id="proveedor"
+                  {% if modo == "consulta" %}disabled{% endif %}>
+
+              {% if modo == "consulta" %}
+                  {% for proveedor in cat.proveedores %}
+                      {% if c.prov|string == proveedor.valor|string %}
+                          <option value="{{ proveedor.valor }}" selected>
+                              {{ proveedor.texto }}
+                          </option>
+                      {% endif %}
+                  {% endfor %}
+              {% else %}
+                  <option value="">Seleccione un proveedor</option>
+
+                  {% for proveedor in cat.proveedores %}
+                      <option value="{{ proveedor.valor }}">
+                          {{ proveedor.texto }}
+                      </option>
+                  {% endfor %}
+              {% endif %}
+
+            </select>
+          </div>
+
+          <!-- Fecha pedido -->
+          <div class="f c3">
+            <label>Fecha Pedido</label>
+            <input type="date" name="fecha_pedido" value="{{ c.fped }}" {% if modo=="consulta" %}readonly{% endif %}>
+          </div>
+
+          <!-- Fecha pactada -->
+          <div class="f c2">
+            <label>Fecha Pactada</label>
+            <input type="date" name="fecha_pactada" value="{{ c.fpac }}" {% if modo=="consulta" %}readonly{% endif %}>
+          </div>
+
+          <!-- Tipo pedido -->
+          <div class="f c3">
+            <label>Tipo Pedido</label>
+
+            <div class="radio">
+              <label>
+                <input type="radio" name="tipo_pedido" value="nacional" style="width:auto;min-height:0" {% if not
+                  c.internacional %}checked{% endif %} {% if modo=="consulta" %}disabled{% endif %}>
+                Nacional
+              </label>
+
+              <label>
+                <input type="radio" name="tipo_pedido" value="internacional" style="width:auto;min-height:0" {% if
+                  c.internacional %}checked{% endif %} {% if modo=="consulta" %}disabled{% endif %}>
+                Internacional
+              </label>
+            </div>
+          </div>
+
+          <!-- Orden de compra -->
+          <div class="f c4">
+            <label>Orden de Compra</label>
+            <input name="orden_compra" value="{{ c.oc }}" {% if modo=="consulta" %}readonly{% endif %}>
+          </div>
+
+          <!-- Lote interno -->
+          <div class="f c3">
+            <label>Lote Int.</label>
+            <input name="lote" value="{{ c.lote }}" placeholder="—" {% if modo=="consulta" %}readonly{% endif %}>
+          </div>
+
+          <!-- TRM -->
+          <div class="f c2">
+            <label>TRM</label>
+            <input class="num" name="trm" value="{{ c.trm | fmt if c.trm is not none else '' }}" {% if modo=="consulta"
+              %}readonly{% endif %}>
+          </div>
+
+          <!-- Código PLU -->
+          <div class="f c3">
+            <label>Cod. Plu</label>
+            <input value="{{ sel.plu }}" readonly>
+          </div>
+
+          <!-- Nombre producto -->
+          <div class="f c4">
+            <label>Nombre del producto</label>
+            <input value="{{ sel.nombre }}" readonly>
+          </div>
+
+          <!-- Nivel destino -->
+          <div class="f c3">
+            <label>Nivel Destino</label>
+
+            <select name="nivel"
+                    id="nivel"
+                    {% if modo == "consulta" %}disabled{% endif %}>
+
+                {% if modo != "consulta" %}
+                    <option value="">Seleccione nivel</option>
+                {% endif %}
+
+                {% for nivel in cat.niveles %}
+                    <option value="{{ nivel.valor }}"
+                        {% if sel.nivel|string == nivel.valor|string %}selected{% endif %}>
+                        {{ nivel.texto }}
+                    </option>
+                {% endfor %}
+            </select>
+          </div>
+
+          <!-- Precio compra -->
+          <div class="f c2">
+            <label>Precio Compra</label>
+            <input class="num" value="{{ sel.precio | fmt if sel.precio is not none else '' }}" readonly>
+          </div>
+
+          <!-- Precio US -->
+          <div class="f c2">
+            <label>Precio US</label>
+            <input class="num" value="{{ sel.us | fmt if sel.us is not none else '' }}" readonly>
+          </div>
+
+          <!-- Bodega destino -->
+          <div class="f c5">
+            <label>Bodega destino</label>
+
+            <select name="bodega"
+                    id="bodega"
+                    {% if modo == "consulta" %}disabled{% endif %}>
+
+                {% if modo != "consulta" %}
+                    <option value="">Seleccione bodega</option>
+                {% endif %}
+
+                {% for bodega in cat.bodegas %}
+                    <option value="{{ bodega.valor }}"
+                        {% if c.bod|string == bodega.valor|string %}selected{% endif %}>
+                        {{ bodega.texto }}
+                    </option>
+                {% endfor %}
+            </select>
+          </div>
+
+          <!-- Registrado por -->
+          <div class="f c5">
+            <label class="reg">REGISTRADO POR</label>
+            <input value="{{ c.reg }}" readonly>
+          </div>
+
+          <!-- Descripción -->
+          <div class="f c6">
+            <label style="display:flex;justify-content:space-between">
+              Descripción
+              <span class="cnt">0/255 caracteres</span>
+            </label>
+
+            <textarea name="descripcion" rows="3" maxlength="255" placeholder="Descripción del requerimiento..." {% if
+              modo=="consulta" %}readonly{% endif %}></textarea>
+          </div>
+
+          <!-- Notas -->
+          <div class="f c6">
+            <label>Cantidad</label>
+            <input class="num" name="cant" value="{{ c.trm | fmt if c.trm is not none else '' }}" {% if modo=="consulta"
+              %}readonly{% endif %}>
+           <!-- 
+              <textarea name="notas" rows="3" placeholder="Notas adicionales..." {% if modo=="consulta" %}readonly{% endif
+              %}></textarea>
+           --> 
+          </div>
+
+        </div>
       </div>
-      <div class="f c3"><label>Fecha Pedido</label><input type="date" value="{{ c.fped }}" readonly></div>
-      <div class="f c2"><label>Fecha Pactada</label><input type="date" value="{{ c.fpac }}" readonly></div>
 
-      <div class="f c3"><label>Tipo Pedido</label>
-        <div class="radio"><label><input type="radio" disabled style="width:auto;min-height:0"{{ " checked" if c and not c.internacional }}>Nacional</label><label><input type="radio" disabled style="width:auto;min-height:0"{{ " checked" if c and c.internacional }}>Internacional</label></div></div>
-      <div class="f c4"><label>Orden de Compra</label><input value="{{ c.oc }}" readonly></div>
-      <div class="f c3"><label>Lote Int.</label><input value="{{ c.lote }}" placeholder="—" readonly></div>
-      <div class="f c2"><label>TRM</label><input class="num" value="{{ c.trm | fmt if c else '' }}" readonly></div>
+      <!-- Resumen del pedido -->
+      <aside class="card side">
 
-      <div class="f c3"><label>Cod. Plu</label><input value="{{ sel.plu }}" readonly></div>
-      <div class="f c4"><label>Nombre del producto</label><input value="{{ sel.nombre }}" readonly></div>
-      <div class="f c3"><label>Nivel Destino</label><input value="{{ sel.nivel }}" readonly></div>
-      <div class="f c3">
-    <label>Nivel Destino</label>
-    <select name="nivel" id="nivel">
-        <option value="">Seleccione un nivel</option>
+        <h2>Resumen del Pedido</h2>
 
-        {% for nivel in niveles %}
-            <option value="{{ nivel.valor }}"
-                {% if sel.nivel|string == nivel.valor|string %}selected{% endif %}>
-                {{ nivel.texto }}
-            </option>
-        {% endfor %}
-    </select>
-</div>
-      <div class="f c2"><label>Precio Compra</label><input class="num" value="{{ sel.precio | fmt if sel else '' }}" readonly></div>
-      <div class="f c2"><label>Precio US</label><input class="num" value="{{ sel.us | fmt if sel else '' }}" readonly></div>
+        <div class="kv">
+          <span><i class="dot" style="background:#4cb5a3"></i>Profit</span>
+          <b class="num">0</b>
+        </div>
 
-      <div class="f c5"><label>Bodega destino</label><input value="{{ c.bod }}" readonly></div>
-      <div class="f c5"><label class="reg">REGISTRADO POR</label><input value="{{ c.reg }}" readonly></div>
+        <div class="kv">
+          <span><i class="dot" style="background:var(--brand2)"></i>Cost</span>
+          <b class="num">{{ cost | fmt }}</b>
+        </div>
 
-      <div class="f c6"><label style="display:flex;justify-content:space-between">Descripcion <span class="cnt">0/255 caracteres</span></label>
-        <textarea rows="3" placeholder="Descripción del requerimiento..." readonly></textarea></div>
-      <div class="f c6"><label>Note</label><textarea rows="3" placeholder="Notas adicionales..." readonly></textarea></div>
+        <div class="kv">
+          <span>Margin</span>
+          <b>{{ margin }}%</b>
+        </div>
+
+        <div class="sub">Participación por producto</div>
+
+        <div class="bars">
+          {% for b in bars %}
+          <div class="bar">
+            <span title="{{ b.full }}">{{ b.plu }} · {{ b.corto }}…</span>
+            <progress value="{{ b.pct }}" max="100">{{ b.pct }}%</progress>
+            <span>{{ b.pct }}%</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="sub">Avance del pedido</div>
+
+        <div class="steps">
+          {% for s in steps %}
+          <div class="st {{ s.cls }}">
+            <b></b>{{ s.t }}
+            <small>{{ s.s }}</small>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="tot">
+          <div class="kv">
+            <span>Orden total</span>
+            <span class="v">{{ total_iva | fmt }} COP</span>
+          </div>
+
+          <div class="kv">
+            <span>VAT taxable total</span>
+            <span class="v">{{ cost | fmt }} COP</span>
+          </div>
+        </div>
+
+      </aside>
     </div>
+
+    <!-- Tabla de productos -->
+    <div class="card grid">
+
+      <div class="gtools">
+        <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Exportar">⇱</button>
+        <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar líneas">✎</button>
+      </div>
+
+      <div class="scroll">
+        <table>
+
+          <thead>
+            <tr>
+              <th>plu</th>
+              <th>Nombre del producto</th>
+              <th class="r">Bodega Destino</th>
+              <th>Nivel</th>
+              <th class="r">Cantidad</th>
+              <th class="r">Precio sin iva</th>
+              <th class="r">Precio US SIN IVA</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for ln in lineas %}
+            <tr class="{{ 'sel' if ln.sel }}">
+              <td data-label="plu">
+                <a class="fila" href="{{ ln.url }}">{{ ln.plu }}</a>
+              </td>
+              <td data-label="Nombre del producto">{{ ln.nombre }}</td>
+              <td class="r" data-label="Bodega Destino">{{ ln.bod }}</td>
+              <td data-label="Nivel">{{ ln.nivel }}</td>
+              <td class="r" data-label="Cantidad">{{ ln.qty | fmt }}</td>
+              <td class="r" data-label="Precio sin iva">{{ ln.precio | fmt }}</td>
+              <td class="r" data-label="Precio US SIN IVA">{{ ln.us | fmt }}</td>
+            </tr>
+            {% else %}
+            <tr class="empty">
+              <td colspan="7">Sin productos para mostrar.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+
+        </table>
+      </div>
+    </div>
+
+    <!-- Pie -->
+    <div class="foot">
+
+      <div class="vat">
+        VAT taxable total
+        <b>{{ cost | fmt }} COP</b>
+      </div>
+
+      {% if modo == "nuevo" %}
+      <button class="btn primary" disabled title="Disponible en la siguiente etapa">
+        🚚 Crear solicitud
+      </button>
+      {% else %}
+      <button class="btn primary" disabled title="Disponible en la siguiente etapa">
+        🚚 Create shipment
+      </button>
+      {% endif %}
+
+    </div>
+
   </div>
-
-  <aside class="card side">
-    <h2>Resumen del Pedido</h2>
-    <div class="kv"><span><i class="dot" style="background:#4cb5a3"></i>Profit</span><b class="num">0</b></div>
-    <div class="kv"><span><i class="dot" style="background:var(--brand2)"></i>Cost</span><b class="num">{{ cost | fmt }}</b></div>
-    <div class="kv"><span>Margin</span><b>{{ margin }}%</b></div>
-    <div class="sub">Participación por producto</div>
-    <div class="bars">
-      {% for b in bars %}<div class="bar"><span title="{{ b.full }}">{{ b.plu }} · {{ b.corto }}…</span><progress value="{{ b.pct }}" max="100">{{ b.pct }}%</progress><span>{{ b.pct }}%</span></div>{% endfor %}
-    </div>
-    <div class="sub">Avance del pedido</div>
-    <div class="steps">
-      {% for s in steps %}<div class="st {{ s.cls }}"><b></b>{{ s.t }}<small>{{ s.s }}</small></div>{% endfor %}
-    </div>
-    <div class="tot">
-      <div class="kv"><span>Orden total</span><span class="v">{{ total_iva | fmt }} COP</span></div>
-      <div class="kv"><span>VAT taxable total</span><span class="v">{{ cost | fmt }} COP</span></div>
-    </div>
-  </aside>
-</div>
-
-<div class="card grid">
-  <div class="gtools">
-    <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Exportar">⇱</button>
-    <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar líneas">✎</button>
-  </div>
-  <div class="scroll">
-    <table>
-      <thead><tr><th>plu</th><th>Nombre del producto</th><th class="r">Bodega Destino</th><th>Nivel</th><th class="r">Cantidad</th><th class="r">Precio sin iva</th><th class="r">Precio US SIN IVA</th></tr></thead>
-      <tbody>
-        {% for ln in lineas %}
-        <tr class="{{ 'sel' if ln.sel }}">
-          <td data-label="plu"><a class="fila" href="{{ ln.url }}">{{ ln.plu }}</a></td><td data-label="Nombre del producto">{{ ln.nombre }}</td>
-          <td class="r" data-label="Bodega Destino">{{ ln.bod }}</td><td data-label="Nivel">{{ ln.nivel }}</td>
-          <td class="r" data-label="Cantidad">{{ ln.qty | fmt }}</td><td class="r" data-label="Precio sin iva">{{ ln.precio | fmt }}</td><td class="r" data-label="Precio US SIN IVA">{{ ln.us | fmt }}</td>
-        </tr>
-        {% else %}
-        <tr class="empty"><td colspan="7">Sin productos para mostrar.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="foot">
-  <div class="vat">VAT taxable total <b>{{ cost | fmt }} COP</b></div>
-  <button class="btn primary" disabled title="Disponible en la siguiente etapa">🚚 Create shipment</button>
-</div>
-</div>
 </body>
+
 </html>
