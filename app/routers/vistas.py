@@ -78,6 +78,7 @@ def _cabecera(cab: dict) -> dict:
         "tipo": 2 if cab["tpo_ped"] == 2 else 1, "oc": _txt(cab["orden_cmpra_int"]),
         "lote": _txt(cab["lte_int"]), "trm": cab["trm"], "bod": _txt(cab["bdga_dstno"]),
         "reg": _txt(cab["realizado"]),
+        "fcha_recibido": (cab["fcha_recibido"]),
     }
 
 
@@ -87,7 +88,7 @@ def _lineas_y_resumen(filas: list[dict], sel_i: int, url_linea) -> tuple[list, l
         t = float(f["cntdad_pdda"] or 0) * float(f["prcio_cmpra"] or 0)
         costo += t
         lineas.append({
-            "plu": f["cdgo_plu"], "nombre": _txt(f["nmbre_prdcto"]), "bod": _txt(f["lclzcion"]),
+            "plu": f["cdgo_plu"], "nombre": _txt(f["nmbre_prdcto"]), "bod": f'{_txt(f["lclzcion"])} - {_txt(f["nombre_localizacion"])}',
             "nivel": _txt(f["tpo_lmpza"]), "qty": f["cntdad_pdda"], "precio": f["prcio_cmpra"],
             "us": f["prcio_mnda"], "t": t, "sel": k == sel_i, "url": url_linea(k),
         })

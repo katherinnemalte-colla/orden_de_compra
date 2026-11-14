@@ -59,7 +59,7 @@ def cargar_pedido(numero_pedido: int) -> dict | None:
         """
         SELECT a.nmro_pddo, a.orden_cmpra_int, a.idntfccion, c.nmbre_prvdor,
                a.fcha_pddo, a.fcha_pctda, a.estdo, a.lte_int, a.trm, a.tpo_ped,
-               a.bdga_dstno, a.realizado, a.recibido
+               a.bdga_dstno, a.realizado, a.recibido, a.fcha_recibido
         FROM pddos_prvdor a
         LEFT JOIN prvdres c ON c.idntfccion = a.idntfccion
         WHERE a.nmro_pddo = :n
@@ -71,12 +71,14 @@ def cargar_pedido(numero_pedido: int) -> dict | None:
 
     lineas = Conexion.consultar(
         """
-        SELECT b.cdgo_plu, d.nmbre_prdcto, b.tpo_lmpza, b.lclzcion,
+        SELECT b.cdgo_plu, d.nmbre_prdcto, b.tpo_lmpza, b.lclzcion, l.nmbre AS nombre_localizacion,
                b.cntdad_pdda, b.cntdad_rcbda, b.pso_rcbdo,
                b.prcio_cmpra, b.prcio_mnda, b.nmro_lte, b.lte_prvdor,
                CASE WHEN d.envse = 'GRN' THEN d.undad ELSE d.envse END AS unidad
         FROM pddo_prdcto b
         INNER JOIN prdctos d ON d.cdgo_plu = b.cdgo_plu
+        LEFT JOIN lclzcnes l
+        ON l.lclzcion = b.lclzcion
         WHERE b.nmro_pddo = :n
         ORDER BY d.nmbre_prdcto
         """,
