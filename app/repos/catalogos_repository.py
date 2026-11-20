@@ -44,9 +44,26 @@ class CatalogosRepository:
 
     @classmethod
     def producto(cls, cdgo_plu: int) -> dict | None:
+
+        print("PLU recibido:", repr(cdgo_plu))
+        print("Tipo:", type(cdgo_plu))
+
         filas = Conexion.consultar(
-            "SELECT cdgo_plu, nmbre_prdcto FROM prdctos WHERE cdgo_plu = :plu", {"plu": cdgo_plu}
+            """
+            SELECT cdgo_plu, nmbre_prdcto
+            FROM prdctos
+            WHERE cdgo_plu = :plu
+            """,
+            {"plu": cdgo_plu}
         )
+
+        print("Resultado SQL:", filas)
+
         if not filas:
             return None
-        return {"plu": filas[0]["cdgo_plu"], "nombre": str(filas[0]["nmbre_prdcto"] or "").strip()}
+
+        return {
+            "plu": filas[0]["cdgo_plu"],
+            "nombre": str(filas[0]["nmbre_prdcto"] or "").strip()
+        }
+        

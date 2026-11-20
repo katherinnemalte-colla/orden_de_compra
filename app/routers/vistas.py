@@ -6,16 +6,20 @@ y las reglas de negocio irán en services/.
 import os
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-
+import logging
+from datetime import date
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app.conexion import Conexion
 from app.plantillas import templates
 from app.repos import pedidos_repository
 from app.repos.catalogos_repository import CatalogosRepository as Catalogos
-
+from app.services.pedidos_service import PedidoService
 router = APIRouter(include_in_schema=False)
 
+logger = logging.getLogger(__name__)
 IVA = 0.19  # ajustar al IVA real
 CAMPOS = {"numero_pedido": "Pedido No", "proveedor": "Proveedor", "orden_compra": "Orden de Compra"}
 MSG_VACIO = "No se encontró información para mostrar."
@@ -51,11 +55,6 @@ def _catalogos() -> dict:
 def _pagina(request: Request, ctx: dict) -> HTMLResponse:
     return templates.TemplateResponse(request, "solicitud_compra.html", ctx)
 
-
-def _parcial(macro: str, **kw) -> HTMLResponse:
-    """Renderiza una macro de parciales.html (respuesta para HTMX)."""
-    modulo = templates.env.get_template("parciales.html").module
-    return HTMLResponse(str(getattr(modulo, macro)(**kw)))
 
 
 # ============================================================ contexto
@@ -167,33 +166,93 @@ def contexto_nuevo(request: Request) -> dict:
 def pagina_nuevo(request: Request):
     return _pagina(request, contexto_nuevo(request))
 
+def _a_float(valor: str) -> float:
+    valor = (valor or "").strip().replace(",", ".")
+    return float(valor) if valor else 0.0
+
+
+def _nuevo_con_error(request: Request, mensaje: str, codigo: int, ingresado: dict) -> HTMLResponse:
+    """Vuelve a mostrar la pantalla 'nuevo' con el mensaje y lo que el usuario ya había escrito."""
+    ctx = contexto_nuevo(request)
+    ctx["mensaje"] = mensaje
+    ctx["c"].update({
+        "fped": ingresado["fecha_pedido"],
+        "fpac": ingresado["fecha_pactada"],
+        "lote": ingresado["lote"],
+        "bod": ingresado["bodega"],
+        "internacional": ingresado["tipo_pedido"] == "internacional",
+    })
+    ctx["sel"] = {"plu": ingresado["codigo_plu"], "nivel": ingresado["nivel"]}
+    return templates.TemplateResponse(
+        request, "solicitud_compra.html", ctx, status_code=codigo
+    )
+
+
+@router.post("/nuevo", response_class=HTMLResponse)
+def guardar_nuevo(
+    request: Request,
+    proveedor: int = Form(...),
+    fecha_pedido: date = Form(...),
+    fecha_pactada: date = Form(...),
+    tipo_pedido: str = Form("nacional"),
+    lote: str = Form(""),
+    trm: str = Form(""),
+    bodega: str = Form(...),
+    codigo_plu: int = Form(...),
+    nivel: int = Form(...),
+    cant: str = Form(...),
+    precio: str = Form(...),
+    precio_us: str = Form(""),
+):
+    ingresado = {
+        "fecha_pedido": fecha_pedido.isoformat(),
+        "fecha_pactada": fecha_pactada.isoformat(),
+        "lote": lote, "bodega": bodega, "tipo_pedido": tipo_pedido,
+        "codigo_plu": codigo_plu, "nivel": nivel,
+    }
+
+    cabecera = {
+        "codigo_proveedor": proveedor,
+        "fecha_pedido": fecha_pedido,
+        "fecha_pactada": fecha_pactada,
+        "tipo_pedido": 2 if tipo_pedido == "internacional" else 1,
+        "lote_interno": lote.strip() or None,
+        "trm": _a_float(trm),
+        "bodega_destino": bodega,
+    }  # el usuario lo completa PedidosService
+
+    detalles = [{
+        "codigo_plu": codigo_plu,
+        "cantidad_pedida": _a_float(cant),
+        "nivel": nivel,
+        "precio": _a_float(precio),
+        "precio_us": _a_float(precio_us),
+    }]
+
+    try:
+        resultado = PedidoService.crear_pedido(cabecera, detalles)
+
+    except ValueError as error:
+        logger.warning("Validación al crear pedido: %s", error)
+        return _nuevo_con_error(request, str(error), 400, ingresado)
+
+    except IntegrityError:
+        logger.exception("Error de integridad en SQL Server")
+        return _nuevo_con_error(request, "Conflicto de datos al registrar el pedido.", 409, ingresado)
+
+    except SQLAlchemyError:
+        logger.exception("Error de SQLAlchemy al crear pedido")
+        return _nuevo_con_error(request, "Error al guardar el pedido en la base de datos.", 500, ingresado)
+
+    except Exception:
+        logger.exception("Error inesperado al crear pedido")
+        return _nuevo_con_error(request, "Ocurrió un error inesperado al crear el pedido.", 500, ingresado)
+
+    # 303: el navegador pasa a GET y un refresco no reenvía el formulario
+    return RedirectResponse(f"/?valor={resultado['numero_pedido']}", status_code=303)
+
 
 @router.get("/", response_class=HTMLResponse)
 def inicio(request: Request, campo: str = "numero_pedido", valor: str = "",
            i: int | None = None, l: int = 0):
     return _pagina(request, contexto_consulta(campo, valor, i, l))
-
-
-
-# ------------------------------------------- fragmentos HTMX (nuevo y editar)
-@router.get("/parciales/producto", response_class=HTMLResponse)
-def parcial_producto(plu: str = ""):
-    """Cod. Plu -> valida que exista y autollena el nombre del producto."""
-    plu = plu.strip()
-    if not plu:
-        return _parcial("nombre_producto")
-    if not plu.isdigit():
-        return _parcial("nombre_producto", error="El código debe ser numérico.")
-    prod = Catalogos.producto(int(plu))
-    if prod is None:
-        return _parcial("nombre_producto", error="El producto no existe.")
-    return _parcial("nombre_producto", nombre=prod["nombre"])
-
-
-@router.get("/parciales/tipo", response_class=HTMLResponse)
-def parcial_tipo(proveedor: str = ""):
-    """Proveedor -> define Tipo Pedido."""
-    tipo = 0
-    if proveedor.strip().isdigit():
-        tipo = _tipo_pedido(Catalogos.tipo_proveedor(int(proveedor)))
-    return _parcial("tipo_pedido", tipo=tipo)

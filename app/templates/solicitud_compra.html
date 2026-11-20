@@ -72,69 +72,65 @@
     <div class="msg" role="alert">{{ mensaje }}</div>
     {% endif %}
 
-    <div class="main">
+    {# CAMBIO: activa validación nativa solo en modo nuevo #}
+    {% set req = 'required' if modo == 'nuevo' else '' %}
+    {# CAMBIO: tipo numérico solo en nuevo; en consulta se queda "text" porque el valor viene formateado con fmt #}
+    {% set tnum = 'number' if modo == 'nuevo' else 'text' %}
+
+    <form class="main" id="form-pedido" {% if modo=="nuevo" %}method="POST" action="/nuevo" {% endif %}>
 
       <div class="card">
-
         <div class="form">
 
-          <!-- Estado -->
+          <!-- Estado (sin cambios) -->
           <div class="f c3">
             <label>Estado</label>
             <input class="estado e{{ c.estdo }}" value="{{ c.estado }}" readonly>
           </div>
-          
+
           <!-- Proveedor -->
           <div class="f c4">
             <label>Proveedor</label>
-            <select name="proveedor"
-                  id="proveedor"
-                  {% if modo == "consulta" %}disabled{% endif %}>
+            <select name="proveedor" id="proveedor" {{ req }} {# CAMBIO #} {% if modo=="consulta" %}disabled{% endif %}>
 
               {% if modo == "consulta" %}
-                  {% for proveedor in cat.proveedores %}
-                      {% if c.prov|string == proveedor.valor|string %}
-                          <option value="{{ proveedor.valor }}" selected>
-                              {{ proveedor.texto }}
-                          </option>
-                      {% endif %}
-                  {% endfor %}
-              {% else %}
-                  <option value="">Seleccione un proveedor</option>
-
-                  {% for proveedor in cat.proveedores %}
-                      <option value="{{ proveedor.valor }}">
-                          {{ proveedor.texto }}
-                      </option>
-                  {% endfor %}
+              {% for proveedor in cat.proveedores %}
+              {% if c.prov|string == proveedor.valor|string %}
+              <option value="{{ proveedor.valor }}" selected>{{ proveedor.texto }}</option>
               {% endif %}
-
+              {% endfor %}
+              {% else %}
+              <option value="">Seleccione un proveedor</option>
+              {% for proveedor in cat.proveedores %}
+              <option value="{{ proveedor.valor }}">{{ proveedor.texto }}</option>
+              {% endfor %}
+              {% endif %}
             </select>
           </div>
 
           <!-- Fecha pedido -->
           <div class="f c3">
             <label>Fecha Pedido</label>
-            <input type="date" name="fecha_pedido" value="{{ c.fped }}" {% if modo=="consulta" %}readonly{% endif %}>
+            <input type="date" name="fecha_pedido" value="{{ c.fped }}" {{ req }} {# CAMBIO #} {% if modo=="consulta"
+              %}readonly{% endif %}>
           </div>
 
           <!-- Fecha pactada -->
           <div class="f c2">
             <label>Fecha Pactada</label>
-            <input type="date" name="fecha_pactada" value="{{ c.fpac }}" {% if modo=="consulta" %}readonly{% endif %}>
+            <input type="date" name="fecha_pactada" value="{{ c.fpac }}" {{ req }} {# CAMBIO #} {% if modo=="consulta"
+              %}readonly{% endif %}>
           </div>
 
-          <!-- Tipo pedido -->
+          <!-- Tipo pedido (sin cambios) -->
           <div class="f c3">
             <label>Tipo Pedido</label>
-
             <div class="radio">
               <label>
                 <input type="radio" name="tipo_pedido" value="nacional" style="width:auto;min-height:0" {% if not
                   c.internacional %}checked{% endif %} {% if modo=="consulta" %}disabled{% endif %}>
                 Nacional
               </label>
-
               <label>
                 <input type="radio" name="tipo_pedido" value="internacional" style="width:auto;min-height:0" {% if
                   c.internacional %}checked{% endif %} {% if modo=="consulta" %}disabled{% endif %}>
@@ -143,13 +139,13 @@
             </div>
           </div>
 
-          <!-- Orden de compra -->
+          <!-- Orden de compra (sin cambios; el servicio todavía no la guarda) -->
           <div class="f c4">
             <label>Orden de Compra</label>
             <input name="orden_compra" value="{{ c.oc }}" {% if modo=="consulta" %}readonly{% endif %}>
           </div>
 
-          <!-- Lote interno -->
+          <!-- Lote interno (sin cambios) -->
           <div class="f c3">
             <label>Lote Int.</label>
             <input name="lote" value="{{ c.lote }}" placeholder="—" {% if modo=="consulta" %}readonly{% endif %}>
@@ -158,108 +154,105 @@
           <!-- TRM -->
           <div class="f c2">
             <label>TRM</label>
-            <input class="num" name="trm" value="{{ c.trm | fmt if c.trm is not none else '' }}" {% if modo=="consulta"
-              %}readonly{% endif %}>
+            <input class="num" name="trm" type="{{ tnum }}" step="any" {# CAMBIO #}
+              value="{{ c.trm | fmt if c.trm is not none else '' }}" {% if modo=="consulta" %}readonly{% endif %}>
           </div>
 
           <!-- Código PLU -->
           <div class="f c3">
             <label>Cod. Plu</label>
-            <input value="{{ sel.plu }}" readonly>
+            <input id="codigo_plu" name="codigo_plu" type="{{ tnum }}" value="{{ sel.plu }}" {{ req }} {% if
+              modo=="consulta" %}readonly{% endif %}>
           </div>
 
-          <!-- Nombre producto -->
+          <!-- Nombre producto: siempre readonly -->
           <div class="f c4">
             <label>Nombre del producto</label>
-            <input value="{{ sel.nombre }}" readonly>
+            <input id="nombre_producto" value="{{ sel.nombre }}" readonly tabindex="-1">
+            <small id="error_producto" class="err" hidden></small>
           </div>
 
           <!-- Nivel destino -->
           <div class="f c3">
             <label>Nivel Destino</label>
+            <select name="nivel" id="nivel" {{ req }} {# CAMBIO #} {% if modo=="consulta" %}disabled{% endif %}>
 
-            <select name="nivel"
-                    id="nivel"
-                    {% if modo == "consulta" %}disabled{% endif %}>
+              {% if modo != "consulta" %}
+              <option value="">Seleccione nivel</option>
+              {% endif %}
 
-                {% if modo != "consulta" %}
-                    <option value="">Seleccione nivel</option>
-                {% endif %}
-
-                {% for nivel in cat.niveles %}
-                    <option value="{{ nivel.valor }}"
-                        {% if sel.nivel|string == nivel.valor|string %}selected{% endif %}>
-                        {{ nivel.texto }}
-                    </option>
-                {% endfor %}
+              {% for nivel in cat.niveles %}
+              <option value="{{ nivel.valor }}" {% if sel.nivel|string==nivel.valor|string %}selected{% endif %}>
+                {{ nivel.texto }}
+              </option>
+              {% endfor %}
             </select>
           </div>
 
           <!-- Precio compra -->
           <div class="f c2">
             <label>Precio Compra</label>
-            <input class="num" value="{{ sel.precio | fmt if sel.precio is not none else '' }}" readonly>
+
+            <input class="num" name="precio" type="number" step="any"
+              value="{{ sel.precio if sel.precio is not none else '' }}" {% if modo=="nuevo" %}required{% endif %} {% if
+              modo=="consulta" %}readonly{% endif %}>
           </div>
+
 
           <!-- Precio US -->
           <div class="f c2">
             <label>Precio US</label>
-            <input class="num" value="{{ sel.us | fmt if sel.us is not none else '' }}" readonly>
+            {# CAMBIO: name, type; editable solo en nuevo #}
+            <input class="num" name="precio_us" type="{{ tnum }}" step="any"
+              value="{{ sel.us | fmt if sel.us is not none else '' }}" {% if modo=="consulta" %}readonly{% endif %}>
           </div>
 
           <!-- Bodega destino -->
           <div class="f c5">
             <label>Bodega destino</label>
+            <select name="bodega" id="bodega" {{ req }} {# CAMBIO #} {% if modo=="consulta" %}disabled{% endif %}>
 
-            <select name="bodega"
-                    id="bodega"
-                    {% if modo == "consulta" %}disabled{% endif %}>
+              {% if modo != "consulta" %}
+              <option value="">Seleccione bodega</option>
+              {% endif %}
 
-                {% if modo != "consulta" %}
-                    <option value="">Seleccione bodega</option>
-                {% endif %}
-
-                {% for bodega in cat.bodegas %}
-                    <option value="{{ bodega.valor }}"
-                        {% if c.bod|string == bodega.valor|string %}selected{% endif %}>
-                        {{ bodega.texto }}
-                    </option>
-                {% endfor %}
+              {% for bodega in cat.bodegas %}
+              <option value="{{ bodega.valor }}" {% if c.bod|string==bodega.valor|string %}selected{% endif %}>
+                {{ bodega.texto }}
+              </option>
+              {% endfor %}
             </select>
           </div>
 
           <!-- Registrado por -->
           <div class="f c5">
             <label class="reg">REGISTRADO POR</label>
-            <input value="{{ c.reg }}" readonly>
+            <input value="{{ c.reg }}  -  {{ c.fcha_recibido }}" readonly>
           </div>
 
-          <!-- Descripción -->
+          <!-- Descripción (sin cambios; el servicio todavía no la guarda) -->
           <div class="f c6">
             <label style="display:flex;justify-content:space-between">
               Descripción
               <span class="cnt">0/255 caracteres</span>
             </label>
-
             <textarea name="descripcion" rows="3" maxlength="255" placeholder="Descripción del requerimiento..." {% if
               modo=="consulta" %}readonly{% endif %}></textarea>
           </div>
 
-          <!-- Notas -->
+          <!-- Cantidad -->
           <div class="f c6">
             <label>Cantidad</label>
-            <input class="num" name="cant" value="{{ c.trm | fmt if c.trm is not none else '' }}" {% if modo=="consulta"
-              %}readonly{% endif %}>
-           <!-- 
-              <textarea name="notas" rows="3" placeholder="Notas adicionales..." {% if modo=="consulta" %}readonly{% endif
-              %}></textarea>
-           --> 
+            {% if modo == "nuevo" %}
+            <input class="num" name="cant" type="number" step="any" min="0" required value="">
+            {% else %}
+            <input class="num" name="cant" value="{{ sel.qty | fmt if sel.qty is not none else '' }}" readonly>
+            {% endif %}
           </div>
 
         </div>
       </div>
 
-      <!-- Resumen del pedido -->
       <aside class="card side">
 
         <h2>Resumen del Pedido</h2>
@@ -315,13 +308,13 @@
         </div>
 
       </aside>
-    </div>
+    </form>
 
     <!-- Tabla de productos -->
     <div class="card grid">
 
       <div class="gtools">
-        <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Exportar">⇱</button>
+        <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Exportar">+</button>
         <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar líneas">✎</button>
       </div>
 
@@ -373,7 +366,7 @@
       </div>
 
       {% if modo == "nuevo" %}
-      <button class="btn primary" disabled title="Disponible en la siguiente etapa">
+      <button class="btn primary" type="submit" form="form-pedido">
         🚚 Crear solicitud
       </button>
       {% else %}
@@ -385,6 +378,59 @@
     </div>
 
   </div>
+  {% if modo == "nuevo" %}
+  <script>
+    (function () {
+      // Ajusta el prefijo según el router donde está tu endpoint.
+      // Si está en el router con prefix="/api/pedidos", la URL es:
+      const URL_PRODUCTO = "/api/pedidos/producto/";
+
+      const plu = document.getElementById("codigo_plu");
+      const nombre = document.getElementById("nombre_producto");
+      const error = document.getElementById("error_producto");
+      let espera = null;
+      let control = null;
+
+      function limpiar(msg) {
+        nombre.value = "";
+        error.textContent = msg || "";
+        error.hidden = !msg;
+      }
+
+      async function buscarNombre() {
+        const valor = plu.value.trim();
+
+        if (control) control.abort();      // cancela la consulta anterior
+
+        if (!valor) return limpiar("");
+        if (!/^\d+$/.test(valor)) return limpiar("El código debe ser numérico.");
+
+        control = new AbortController();
+        try {
+          const r = await fetch(URL_PRODUCTO + encodeURIComponent(valor), {
+            signal: control.signal,
+          });
+
+          if (r.status === 404) return limpiar("El producto no existe.");
+          if (!r.ok) return limpiar("No se pudo consultar el producto.");
+
+          const prod = await r.json();
+          nombre.value = prod.nombre || "";
+          error.textContent = "";
+          error.hidden = true;
+        } catch (e) {
+          if (e.name !== "AbortError") limpiar("No se pudo consultar el producto.");
+        }
+      }
+
+      plu.addEventListener("input", function () {
+        clearTimeout(espera);
+        espera = setTimeout(buscarNombre, 400);   // espera 400 ms tras la última tecla
+      });
+      plu.addEventListener("blur", buscarNombre);
+    })();
+  </script>
+  {% endif %}
 </body>
 
 </html>
