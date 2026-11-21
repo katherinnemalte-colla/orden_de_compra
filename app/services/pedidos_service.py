@@ -3,10 +3,13 @@ import logging
 import os
 from app.conexion import Conexion
 from app.repos.pedido_repository import PedidoRepository
+from app.repos import pedidos_repository
 from app.repos.pedido_detalle_repository import PedidoDetalleRepository
 from app.repos.consecutivo_repository import ConsecutivoRepository
 from sqlalchemy import text
 logger = logging.getLogger(__name__)
+class ProductoDuplicado(ValueError):
+        """El PLU (con ese nivel) ya está en el pedido."""
 class PedidoService:
     
     @staticmethod
@@ -314,3 +317,45 @@ class PedidoService:
                 "Error inesperado durante la actualización del detalle del pedido."
             )
             raise
+
+# Dentro de la clase PedidosService:
+    
+    # Igual que _clase_estado() en vistas.py: 9 anulado, 3 y 4 recibido; el resto, pendiente.
+    ESTADOS_NO_PENDIENTES = (3, 4, 9)
+
+    @staticmethod
+    def es_pendiente(estado) -> bool:
+        return estado not in PedidoService.ESTADOS_NO_PENDIENTES
+
+    @staticmethod
+    def agregar_detalle(numero_pedido: int, detalle: dict) -> dict:
+        """Agrega un producto a un pedido existente (sin consecutivo)."""
+        d = detalle.copy()
+        d.setdefault("precio_us", 0)
+        d.setdefault("localizacion", None)
+        d.setdefault("numero_lote", None)
+
+        # Mismas validaciones que al crear.
+        PedidoService._validar_detalles([d])
+        datos = pedidos_repository.cargar_pedido(numero_pedido)
+        if datos is None:
+            raise ValueError("El pedido no existe.")
+
+        if not PedidoService.es_pendiente(datos["cabecera"]["estdo"]):
+            raise ValueError(
+                "Solo se pueden agregar productos a pedidos en estado Pendiente."
+            )
+
+        # ¿Ya está el producto? (misma regla que _validar_detalles: PLU + nivel)
+        plu, nivel = int(d["codigo_plu"]), str(d["nivel"]).strip()
+        for f in datos["lineas"]:
+            if int(f["cdgo_plu"]) == plu and str(f["tpo_lmpza"]).strip() == nivel:
+                raise ProductoDuplicado("Producto ya ingresado.")
+
+        with Conexion.transaccion() as connection:
+            d["numero_pedido"] = numero_pedido
+            filas = PedidoDetalleRepository(connection).insertar_detalle_pedido(d)
+            if filas != 1:
+                raise RuntimeError(f"No fue posible insertar el PLU {plu}.")
+
+        return {"exito": True, "numero_pedido": numero_pedido}

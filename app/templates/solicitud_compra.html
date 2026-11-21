@@ -80,22 +80,26 @@
     {% set tnum = 'number' if modo == 'nuevo' else 'text' %}
 
 
+    {# ===== Variables de la plantilla (déjalas una sola vez, arriba del .win) ===== #}
+    {% set req = 'required' if modo == 'nuevo' else '' %}
+    {% set tnum = 'number' if (modo == 'nuevo' and not pedido) else 'text' %}
+    {% set cab_dis = 'disabled' if pedido else '' %}
+    {% set es_int = (c.internacional or c.tipo == 2) %}
+
     <form class="main" id="form-pedido" method="POST"
-      action="{% if modo == 'nuevo' %}/nuevo{% else %}/actualizar-detalle{% endif %}">
+      action="{% if pedido %}/nuevo/{{ pedido }}/lineas{% elif modo == 'nuevo' %}/nuevo{% else %}/actualizar-detalle{% endif %}">
 
       {% if modo == "consulta" %}
       <input type="hidden" name="numero_pedido" value="{{ numero_pedido }}">
       <input type="hidden" name="codigo_plu" value="{{ sel.plu }}">
       <input type="hidden" name="nivel" value="{{ sel.nivel }}">
-      <input type="hidden" name="localizacion" value="{{ sel.localizacion }}">
+      <input type="hidden" name="localizacion" value="{{ sel.localizacion if sel.localizacion is not none else '' }}">
       {% endif %}
-      <!--     
-    <form class="main" id="form-pedido" {% if modo=="nuevo" %}method="POST" action="/nuevo" {% endif %}> -->
 
       <div class="card">
         <div class="form">
 
-          <!-- Estado (sin cambios) -->
+          <!-- Estado -->
           <div class="f c3">
             <label>Estado</label>
             <input class="estado e{{ c.estdo }}" value="{{ c.estado }}" readonly>
@@ -104,7 +108,8 @@
           <!-- Proveedor -->
           <div class="f c4">
             <label>Proveedor</label>
-            <select name="proveedor" id="proveedor" {{ req }} {# CAMBIO #} {% if modo=="consulta" %}disabled{% endif %}>
+            <select name="proveedor" id="proveedor" {{ req }} {{ cab_dis }} {% if modo=="consulta" %}disabled{% endif
+              %}>
 
               {% if modo == "consulta" %}
               {% for proveedor in cat.proveedores %}
@@ -115,7 +120,9 @@
               {% else %}
               <option value="">Seleccione un proveedor</option>
               {% for proveedor in cat.proveedores %}
-              <option value="{{ proveedor.valor }}">{{ proveedor.texto }}</option>
+              <option value="{{ proveedor.valor }}" {% if c.prov|string==proveedor.valor|string %}selected{% endif %}>
+                {{ proveedor.texto }}
+              </option>
               {% endfor %}
               {% endif %}
             </select>
@@ -124,61 +131,64 @@
           <!-- Fecha pedido -->
           <div class="f c3">
             <label>Fecha Pedido</label>
-            <input type="date" name="fecha_pedido" value="{{ c.fped }}" {{ req }} {# CAMBIO #} {% if modo=="consulta"
+            <input type="date" name="fecha_pedido" value="{{ c.fped }}" {{ req }} {{ cab_dis }} {% if modo=="consulta"
               %}readonly{% endif %}>
           </div>
 
           <!-- Fecha pactada -->
           <div class="f c2">
             <label>Fecha Pactada</label>
-            <input type="date" name="fecha_pactada" value="{{ c.fpac }}" {{ req }} {# CAMBIO #} {% if modo=="consulta"
+            <input type="date" name="fecha_pactada" value="{{ c.fpac }}" {{ req }} {{ cab_dis }} {% if modo=="consulta"
               %}readonly{% endif %}>
           </div>
 
-          <!-- Tipo pedido (sin cambios) -->
+          <!-- Tipo pedido -->
           <div class="f c3">
             <label>Tipo Pedido</label>
             <div class="radio">
               <label>
-                <input type="radio" name="tipo_pedido" value="nacional" style="width:auto;min-height:0" {% if not
-                  c.internacional %}checked{% endif %} {% if modo=="consulta" %}disabled{% endif %}>
+                <input type="radio" name="tipo_pedido" value="nacional" style="width:auto;min-height:0" {% if not es_int
+                  %}checked{% endif %} {{ cab_dis }} {% if modo=="consulta" %}disabled{% endif %}>
                 Nacional
               </label>
               <label>
                 <input type="radio" name="tipo_pedido" value="internacional" style="width:auto;min-height:0" {% if
-                  c.internacional %}checked{% endif %} {% if modo=="consulta" %}disabled{% endif %}>
+                  es_int %}checked{% endif %} {{ cab_dis }} {% if modo=="consulta" %}disabled{% endif %}>
                 Internacional
               </label>
             </div>
           </div>
 
-          <!-- Orden de compra (sin cambios; el servicio todavía no la guarda) -->
+          <!-- Orden de compra (el servicio todavía no la guarda) -->
           <div class="f c4">
             <label>Orden de Compra</label>
-            <input name="orden_compra" value="{{ c.oc }}" {% if modo=="consulta" %}readonly{% endif %}>
+            <input name="orden_compra" value="{{ c.oc }}" {{ cab_dis }} {% if modo=="consulta" %}readonly{% endif %}>
           </div>
 
-          <!-- Lote interno (sin cambios) -->
+          <!-- Lote interno -->
           <div class="f c3">
             <label>Lote Int.</label>
-            <input name="lote" value="{{ c.lote }}" placeholder="—" {% if modo=="consulta" %}readonly{% endif %}>
+            <input name="lote" value="{{ c.lote }}" placeholder="—" {{ cab_dis }} {% if modo=="consulta" %}readonly{%
+              endif %}>
           </div>
 
           <!-- TRM -->
           <div class="f c2">
             <label>TRM</label>
-            <input class="num" name="trm" type="{{ tnum }}" step="any" {# CAMBIO #}
-              value="{{ c.trm | fmt if c.trm is not none else '' }}" {% if modo=="consulta" %}readonly{% endif %}>
+            <input class="num" name="trm" type="{{ tnum }}" step="any"
+              value="{{ c.trm | fmt if c.trm is not none else '' }}" {{ cab_dis }} {% if modo=="consulta" %}readonly{%
+              endif %}>
           </div>
 
           <!-- Código PLU -->
           <div class="f c3">
             <label>Cod. Plu</label>
-            <input id="codigo_plu" name="codigo_plu" type="{{ tnum }}" value="{{ sel.plu }}" {{ req }} {% if
-              modo=="consulta" %}readonly{% endif %}>
+            <input id="codigo_plu" type="{{ 'text' if modo == 'consulta' else 'number' }}" {% if modo !="consulta"
+              %}name="codigo_plu" min="1" step="1" {% endif %} value="{{ sel.plu }}" {{ req }} {% if pedido
+              %}autofocus{% endif %} {% if modo=="consulta" %}readonly{% endif %}>
           </div>
 
-          <!-- Nombre producto: siempre readonly -->
+          <!-- Nombre producto: siempre readonly, sin name (nunca viaja en el POST) -->
           <div class="f c4">
             <label>Nombre del producto</label>
             <input id="nombre_producto" value="{{ sel.nombre }}" readonly tabindex="-1">
@@ -188,7 +198,7 @@
           <!-- Nivel destino -->
           <div class="f c3">
             <label>Nivel Destino</label>
-            <select name="nivel" id="nivel" {{ req }} {# CAMBIO #} {% if modo=="consulta" %}disabled{% endif %}>
+            <select name="nivel" id="nivel" {{ req }} {% if modo=="consulta" %}disabled{% endif %}>
 
               {% if modo != "consulta" %}
               <option value="">Seleccione nivel</option>
@@ -205,30 +215,33 @@
           <!-- Precio compra -->
           <div class="f c2">
             <label>Precio Compra</label>
-            <input class="num" name="precio" id="precio" type="number" step="any"
-              value="{{ sel.precio if sel.precio is not none else '' }}" {% if modo=="nuevo" %}required{% else
-              %}readonly{% endif %}>
-          </div>
 
+            <div class="campo-moneda">
+              <input class="num" name="precio" id="precio" type="number" step="any" min="0"
+                value="{{ sel.precio if sel.precio is not none else '' }}" {% if modo=="nuevo" %}required{% else
+                %}readonly{% endif %}>
+            </div>
+          </div>
 
           <!-- Precio US -->
           <div class="f c2">
             <label>Precio US</label>
-            <input class="num" name="precio_us" id="precio_us" type="number" step="any"
-              value="{{ sel.us if sel.us is not none else '' }}" readonly>
+            <input class="num" name="precio_us" id="precio_us" type="number" step="any" min="0"
+              value="{{ sel.us if sel.us is not none else '' }}" {% if modo !="nuevo" %}readonly{% endif %}>
           </div>
 
           <!-- Bodega destino -->
           <div class="f c5">
             <label>Bodega destino</label>
-            <select name="bodega" id="bodega" {{ req }} {# CAMBIO #} {% if modo=="consulta" %}disabled{% endif %}>
+            <select name="bodega" id="bodega" {{ req }} {{ cab_dis }} {% if modo=="consulta" %}disabled{% endif %}>
 
               {% if modo != "consulta" %}
               <option value="">Seleccione bodega</option>
               {% endif %}
 
               {% for bodega in cat.bodegas %}
-              <option value="{{ bodega.valor }}" {% if c.bod|string==bodega.valor|string %}selected{% endif %}>
+              <option value="{{ bodega.valor }}" {% if c.bod|string|trim==bodega.valor|string|trim %}selected{% endif
+                %}>
                 {{ bodega.texto }}
               </option>
               {% endfor %}
@@ -238,29 +251,30 @@
           <!-- Registrado por -->
           <div class="f c5">
             <label class="reg">REGISTRADO POR</label>
-            <input value="{{ c.reg }}  -  {{ c.fcha_recibido }}" readonly>
+            <input value="{{ c.reg }}{% if c.fcha_recibido %}  -  {{ c.fcha_recibido }}{% endif %}" readonly>
           </div>
 
-          <!-- Descripción (sin cambios; el servicio todavía no la guarda) -->
+          <!-- Descripción (el servicio todavía no la guarda) -->
           <div class="f c6">
             <label style="display:flex;justify-content:space-between">
               Descripción
               <span class="cnt">0/255 caracteres</span>
             </label>
-            <textarea name="descripcion" rows="3" maxlength="255" placeholder="Descripción del requerimiento..." {% if
-              modo=="consulta" %}readonly{% endif %}></textarea>
+            <textarea name="descripcion" rows="3" maxlength="255" placeholder="Descripción del requerimiento..." {{
+              cab_dis }} {% if modo=="consulta" %}readonly{% endif %}></textarea>
           </div>
 
           <!-- Cantidad -->
           <div class="f c6">
             <label>Cantidad</label>
             <input class="num" name="cant" id="cant" type="number" step="any" min="0"
-              value="{{ sel.qty if sel.qty is not none else '' }}" {% if modo !="nuevo" %}readonly{% endif %}>
+              value="{{ sel.qty if sel.qty is not none else '' }}" {{ req }} {% if modo !="nuevo" %}readonly{% endif %}>
           </div>
 
         </div>
       </div>
 
+      <!-- Resumen del pedido -->
       <aside class="card side">
 
         <h2>Resumen del Pedido</h2>
@@ -322,8 +336,42 @@
     <div class="card grid">
 
       <div class="gtools">
-        <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Exportar">+</button>
-        <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar líneas">✎</button>
+        {# + : agregar productos #}
+        {% if pedido %}
+        <button class="btn" type="submit" form="form-pedido" title="Agregar producto al pedido {{ pedido }}"
+          aria-label="Agregar producto">+</button>
+        {% elif modo == "consulta" and numero and puede_agregar %}
+        <a class="btn" href="/nuevo?pedido={{ numero }}" title="Agregar productos a este pedido"
+          aria-label="Agregar producto">+</a>
+        {% else %}
+        <button class="btn" disabled aria-label="Agregar producto"
+          title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'Primero cree el pedido' }}">+</button>
+        {% endif %}
+
+        {# ✎ : editar la línea seleccionada (solo en consulta y pedido pendiente) #}
+        {% if modo == "consulta" and numero and puede_agregar and sel.plu %}
+        <button class="btn" type="button" id="btn-editar" title="Editar la línea seleccionada"
+          aria-label="Editar línea">✎</button>
+        {% else %}
+        <button class="btn" type="button" id="btn-editar" disabled
+          title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'No disponible' }}"
+          aria-label="Editar línea">✎</button>
+        {% endif %}
+
+
+        {# 🗑 : eliminar la línea seleccionada #}
+        {% if puede_editar %}
+        <button class="btn peligro" type="submit" form="form-pedido" formaction="/eliminar-detalle" formmethod="post"
+          formnovalidate onclick="return confirm('¿Eliminar el PLU {{ sel.plu }} del pedido {{ numero }}?')"
+          title="Eliminar la línea seleccionada" aria-label="Eliminar línea">
+          <img src="/static/img/papelera.png" alt="Eliminar" class="icono-btn">
+        </button>
+        {% else %}
+        <button class="btn" type="button" disabled aria-label="Eliminar línea"
+          title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'No disponible' }}">
+          <img src="/static/img/papelera.png" alt="Eliminar" class="icono-btn">
+        </button>
+        {% endif %}
       </div>
 
       <div class="scroll">
@@ -373,10 +421,11 @@
         <b>{{ cost | fmt }} COP</b>
       </div>
 
-      {% if modo == "nuevo" %}
-      <button class="btn primary" type="submit" form="form-pedido">
-        🚚 Crear solicitud
-      </button>
+      {% if pedido %}
+      <a class="btn" href="/?valor={{ pedido }}">✔ Finalizar</a>
+      <button class="btn primary" type="submit" form="form-pedido">➕ Agregar producto</button>
+      {% elif modo == "nuevo" %}
+      <button class="btn primary" type="submit" form="form-pedido">🚚 Crear solicitud</button>
       {% else %}
       <button class="btn primary" type="button" id="btn-guardar-cambios" disabled>
         Guardar cambios
@@ -385,12 +434,23 @@
 
     </div>
 
-  </div>
+  </div> {# cierra .win #}
+  {# ===== Aviso modal: "Producto ya ingresado." (equivale al MESSAGEBOX) ===== #}
+  {% if aviso %}
+  <dialog id="aviso" class="aviso">
+    <h3>⛔ {{ aviso.titulo }}</h3>
+    <p>{{ aviso.texto }}</p>
+    <form method="dialog"><button class="btn primary">Aceptar</button></form>
+  </dialog>
+  <script>
+    document.getElementById("aviso").showModal();
+  </script>
+  {% endif %}
+
+  {# ===== Modo nuevo (y agregando): nombre del producto según el PLU ===== #}
   {% if modo == "nuevo" %}
   <script>
     (function () {
-      // Ajusta el prefijo según el router donde está tu endpoint.
-      // Si está en el router con prefix="/api/pedidos", la URL es:
       const URL_PRODUCTO = "/api/pedidos/producto/";
 
       const plu = document.getElementById("codigo_plu");
@@ -439,6 +499,8 @@
     })();
   </script>
   {% endif %}
+
+  {# ===== Modo consulta: editar la línea seleccionada ===== #}
   {% if modo == "consulta" %}
   <script>
     document.addEventListener("DOMContentLoaded", function () {
@@ -447,37 +509,31 @@
       const btnGuardar = document.getElementById("btn-guardar-cambios");
       const formulario = document.getElementById("form-pedido");
 
-      const campos = [
-        document.getElementById("cant"),
-        document.getElementById("precio"),
-        document.getElementById("precio_us")
-      ];
+      if (!btnEditar || !btnGuardar || !formulario) return;
+
+      const campos = ["cant", "precio", "precio_us"]
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
 
       let editando = false;
 
       btnEditar.addEventListener("click", function () {
-
         if (editando) return;
 
-        campos.forEach(campo => {
-          campo.readOnly = false;
-        });
+        campos.forEach(campo => { campo.readOnly = false; });
 
         btnGuardar.disabled = false;
         btnEditar.disabled = true;
-
         editando = true;
+
+        if (campos[0]) campos[0].focus();
       });
 
       btnGuardar.addEventListener("click", function () {
-
         if (!editando) return;
-
         if (!formulario.reportValidity()) return;
-
         formulario.submit();
       });
-
     });
   </script>
   {% endif %}

@@ -16,7 +16,7 @@ from app.conexion import Conexion
 from app.plantillas import templates
 from app.repos import pedidos_repository
 from app.repos.catalogos_repository import CatalogosRepository as Catalogos
-from app.services.pedidos_service import PedidoService
+from app.services.pedidos_service import PedidoService,ProductoDuplicado
 router = APIRouter(include_in_schema=False)
 
 logger = logging.getLogger(__name__)
@@ -60,13 +60,14 @@ def _pagina(request: Request, ctx: dict) -> HTMLResponse:
 # ============================================================ contexto
 def _contexto(modo: str = "consulta", campo: str = "numero_pedido", valor: str = "",
               mensaje: str | None = None) -> dict:
-    """Contexto vacío: todas las claves que usa la plantilla."""
     return {
         "modo": modo, "editable": modo in ("nuevo", "editar"),
         "campos": CAMPOS, "campo": campo, "valor": valor, "mensaje": mensaje,
         "cat": {}, "c": {}, "sel": {}, "lineas": [], "bars": [], "steps": [],
         "cost": 0, "total_iva": 0, "margin": 0, "contador": "",
-        "nav": {"first": "#", "prev": "#", "next": "#", "last": "#", "actual": "/", "ini": True, "fin": True},
+        "pedido": None, "puede_agregar": False,
+        "nav": {"first": "#", "prev": "#", "next": "#", "last": "#", "actual": "/",
+                "ini": True, "fin": True},
     }
 
 
@@ -210,6 +211,8 @@ def contexto_consulta(
             "ini": idx == 0,
             "fin": idx == len(numeros) - 1
         },
+        "numero": cab["nmro_pddo"],
+        "puede_agregar": PedidoService.es_pendiente(cab["estdo"]),
     })
 
     ctx["cat"] = _catalogos()
@@ -217,10 +220,9 @@ def contexto_consulta(
     return ctx
 
 
-def contexto_nuevo(request: Request) -> dict:
-    """Pantalla en blanco lista para ingresar: combos cargados y valores por defecto."""
-    hoy = Conexion.fecha_servidor().date().isoformat()   # fecha del servidor SQL
-    usuario = os.getenv("APP_USUARIO", "SIN-LOGIN")       # temporal, hasta definir el login
+def contexto_nuevo(request: Request, pedido: int | None = None) -> dict:
+    hoy = Conexion.fecha_servidor().date().isoformat()
+    usuario = os.getenv("APP_USUARIO", "SIN-LOGIN")
     terminal = request.client.host if request.client else ""
     ctx = _contexto("nuevo")
     ctx.update({
@@ -228,14 +230,110 @@ def contexto_nuevo(request: Request) -> dict:
         "c": {"estado": "NUEVO", "estado_clase": "nuevo", "fped": hoy, "fpac": hoy, "tipo": 1,
               "oc": "", "lote": "", "trm": 0, "reg": f"{usuario} - {terminal}"},
     })
+    if pedido is None:
+        return ctx
+
+    # Modo "agregando": cabecera del pedido existente + sus líneas.
+    datos = pedidos_repository.cargar_pedido(pedido)
+    if datos is None:
+        ctx["mensaje"] = MSG_VACIO
+        return ctx
+
+    cab, filas = datos["cabecera"], datos["lineas"]
+    lineas, bars, costo = _lineas_y_resumen(filas, -1, lambda k: f"/?valor={pedido}&l={k}")
+    c = _cabecera(cab)
+    c["internacional"] = cab["tpo_ped"] == 2
+    ctx.update({
+        "pedido": pedido, "c": c, "sel": {},
+        "lineas": lineas, "bars": bars, "steps": _avance(cab),
+        "cost": costo, "total_iva": costo * (1 + IVA),
+    })
     return ctx
 
 
 # ============================================================ rutas
-# /pedidos/nuevo va ANTES de cualquier /pedidos/{n}, para que "nuevo" no se tome como número.
+MSG_NO_PENDIENTE = "Solo se pueden agregar productos a pedidos en estado Pendiente."
+MENSAJES_OK = {
+    "creado": "Pedido {n} creado. Ya puede agregar más productos.",
+    "agregado": "Producto agregado al pedido {n}.",
+}
+
+
 @router.get("/nuevo", response_class=HTMLResponse)
-def pagina_nuevo(request: Request):
-    return _pagina(request, contexto_nuevo(request))
+def pagina_nuevo(request: Request, pedido: int | None = None, ok: str = ""):
+    if pedido is not None:
+        datos = pedidos_repository.cargar_pedido(pedido)
+        if datos and not PedidoService.es_pendiente(datos["cabecera"]["estdo"]):
+            ctx = contexto_consulta("numero_pedido", str(pedido), None, 0)
+            ctx["mensaje"] = MSG_NO_PENDIENTE
+            return _pagina(request, ctx)
+
+    ctx = contexto_nuevo(request, pedido)
+    if ctx["pedido"] and ok in MENSAJES_OK:
+        ctx["mensaje"] = MENSAJES_OK[ok].format(n=pedido)
+    return _pagina(request, ctx)
+
+
+def _agregar_con_error(request: Request, pedido: int, texto: str, codigo: int,
+                       codigo_plu: int, nivel: int, aviso: bool = False) -> HTMLResponse:
+    ctx = contexto_nuevo(request, pedido)
+    if aviso:
+        # Equivale al MESSAGEBOX("...", 16, "Productos Pedido"): ventana modal
+        ctx["aviso"] = {"titulo": "Productos Pedido", "texto": texto}
+    else:
+        prod = Catalogos.producto(codigo_plu)
+        ctx["sel"] = {"plu": codigo_plu, "nivel": nivel,
+                      "nombre": prod["nombre"] if prod else ""}
+        ctx["mensaje"] = texto
+    return templates.TemplateResponse(
+        request, "solicitud_compra.html", ctx, status_code=codigo
+    )
+
+
+@router.post("/nuevo/{pedido}/lineas", response_class=HTMLResponse)
+def agregar_linea(
+    request: Request,
+    pedido: int,
+    codigo_plu: int = Form(...),
+    nivel: int = Form(...),
+    cant: str = Form(...),
+    precio: str = Form(...),
+    precio_us: str = Form(""),
+):
+    detalle = {
+        "codigo_plu": codigo_plu,
+        "cantidad_pedida": _a_float(cant),
+        "nivel": nivel,
+        "precio": _a_float(precio),
+        "precio_us": _a_float(precio_us),
+    }
+
+    try:
+        PedidoService.agregar_detalle(pedido, detalle)
+
+    except ProductoDuplicado as error:   # va antes que ValueError
+        return _agregar_con_error(request, pedido, str(error), 409, codigo_plu, nivel, aviso=True)
+
+    except ValueError as error:          # validaciones y pedido no pendiente
+        logger.warning("Validación al agregar producto: %s", error)
+        return _agregar_con_error(request, pedido, str(error), 400, codigo_plu, nivel)
+
+    except IntegrityError:               # duplicado detectado por la base de datos
+        logger.exception("Integridad al agregar producto")
+        return _agregar_con_error(request, pedido, "Producto ya ingresado.", 409,
+                                  codigo_plu, nivel, aviso=True)
+
+    except SQLAlchemyError:
+        logger.exception("Error de SQLAlchemy al agregar producto")
+        return _agregar_con_error(request, pedido, "Error al guardar el producto en la base de datos.",
+                                  500, codigo_plu, nivel)
+
+    except Exception:
+        logger.exception("Error inesperado al agregar producto")
+        return _agregar_con_error(request, pedido, "Ocurrió un error inesperado al agregar el producto.",
+                                  500, codigo_plu, nivel)
+
+    return RedirectResponse(f"/nuevo?pedido={pedido}&ok=agregado", status_code=303)
 
 def _a_float(valor: str) -> float:
     valor = (valor or "").strip().replace(",", ".")
@@ -320,7 +418,7 @@ def guardar_nuevo(
         return _nuevo_con_error(request, "Ocurrió un error inesperado al crear el pedido.", 500, ingresado)
 
     # 303: el navegador pasa a GET y un refresco no reenvía el formulario
-    return RedirectResponse(f"/?valor={resultado['numero_pedido']}", status_code=303)
+    return RedirectResponse(f"/nuevo?pedido={resultado['numero_pedido']}&ok=creado", status_code=303)
 
 
 
