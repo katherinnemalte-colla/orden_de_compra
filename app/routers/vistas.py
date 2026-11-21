@@ -81,18 +81,50 @@ def _cabecera(cab: dict) -> dict:
     }
 
 
-def _lineas_y_resumen(filas: list[dict], sel_i: int, url_linea) -> tuple[list, list, float]:
-    lineas, costo = [], 0.0
+def _lineas_y_resumen(
+    filas: list[dict],
+    sel_i: int,
+    url_linea
+) -> tuple[list, list, float]:
+
+    lineas = []
+    costo = 0.0
+
     for k, f in enumerate(filas):
-        t = float(f["cntdad_pdda"] or 0) * float(f["prcio_cmpra"] or 0)
-        costo += t
+
+        cantidad = float(f["cntdad_pdda"] or 0)
+        precio = float(f["prcio_cmpra"] or 0)
+
+        total_linea = cantidad * precio
+        costo += total_linea
+
         lineas.append({
-            "plu": f["cdgo_plu"], "nombre": _txt(f["nmbre_prdcto"]), "bod": f'{_txt(f["lclzcion"])} - {_txt(f["nombre_localizacion"])}',
-            "nivel": _txt(f["tpo_lmpza"]), "qty": f["cntdad_pdda"], "precio": f["prcio_cmpra"],
-            "us": f["prcio_mnda"], "t": t, "sel": k == sel_i, "url": url_linea(k),
+            "plu": f["cdgo_plu"],
+            "nombre": _txt(f["nmbre_prdcto"]),
+            "localizacion": f["lclzcion"],
+            "bod": (
+                f'{_txt(f["lclzcion"])} - '
+                f'{_txt(f["nombre_localizacion"])}'
+            ),
+            "nivel": _txt(f["tpo_lmpza"]),
+            "qty": f["cntdad_pdda"],
+            "precio": f["prcio_cmpra"],
+            "us": f["prcio_mnda"],
+            "t": total_linea,
+            "sel": k == sel_i,
+            "url": url_linea(k),
         })
-    bars = [{"plu": x["plu"], "full": x["nombre"], "corto": x["nombre"][:10],
-             "pct": round(x["t"] / costo * 100) if costo else 0} for x in lineas[:8]]
+
+    bars = [
+        {
+            "plu": x["plu"],
+            "full": x["nombre"],
+            "corto": x["nombre"][:10],
+            "pct": round(x["t"] / costo * 100) if costo else 0
+        }
+        for x in lineas[:8]
+    ]
+
     return lineas, bars, costo
 
 
@@ -106,43 +138,82 @@ def _avance(cab: dict) -> list[dict]:
             for n, (t, s) in enumerate(pasos)]
 
 
-def contexto_consulta(campo: str, valor: str, i: int | None, l: int, modo: str = "consulta") -> dict:
-    """Busca, navega y carga un pedido. Sirve igual para consulta y (luego) para editar."""
+def contexto_consulta(
+    campo: str,
+    valor: str,
+    i: int | None,
+    l: int,
+    modo: str = "consulta"
+) -> dict:
+    """Busca, navega y carga un pedido. Sirve igual para consulta y edición."""
+
     campo = campo if campo in CAMPOS else "numero_pedido"
     valor = valor.strip()
 
     if valor and not valor.isdigit():
         return _contexto(modo, campo, valor, "Ingresa solo números.")
 
-    numeros = pedidos_repository.buscar_numeros(**({campo: int(valor)} if valor else {}))
+    numeros = pedidos_repository.buscar_numeros(
+        **({campo: int(valor)} if valor else {})
+    )
+
     if not numeros:
         return _contexto(modo, campo, valor, MSG_VACIO)
 
     idx = i if i is not None else (0 if valor else len(numeros) - 1)
     idx = max(0, min(len(numeros) - 1, idx))
+
     datos = pedidos_repository.cargar_pedido(numeros[idx])
+
     if datos is None:
         return _contexto(modo, campo, valor, MSG_VACIO)
 
     cab, filas = datos["cabecera"], datos["lineas"]
 
     def url(**kw) -> str:
-        return "/?" + urlencode({"campo": campo, "valor": valor, **kw})
+        return "/?" + urlencode({
+            "campo": campo,
+            "valor": valor,
+            **kw
+        })
 
     sel_i = max(0, min(len(filas) - 1, l)) if filas else 0
-    lineas, bars, costo = _lineas_y_resumen(filas, sel_i, lambda k: url(i=idx, l=k))
 
-    ctx = _contexto(modo, campo, str(cab["nmro_pddo"]) if campo == "numero_pedido" else valor)
+    lineas, bars, costo = _lineas_y_resumen(
+        filas,
+        sel_i,
+        lambda k: url(i=idx, l=k)
+    )
+
+    ctx = _contexto(
+        modo,
+        campo,
+        str(cab["nmro_pddo"]) if campo == "numero_pedido" else valor
+    )
+
     ctx.update({
-        "c": _cabecera(cab), "sel": lineas[sel_i] if lineas else {},
-        "lineas": lineas, "bars": bars, "steps": _avance(cab),
-        "cost": costo, "total_iva": costo * (1 + IVA),
+        "numero_pedido": cab["nmro_pddo"],
+        "c": _cabecera(cab),
+        "sel": lineas[sel_i] if lineas else {},
+        "lineas": lineas,
+        "bars": bars,
+        "steps": _avance(cab),
+        "cost": costo,
+        "total_iva": costo * (1 + IVA),
         "contador": f"{idx + 1} de {len(numeros)}",
-        "nav": {"first": url(i=0), "prev": url(i=idx - 1), "next": url(i=idx + 1),
-                "last": url(i=len(numeros) - 1), "actual": url(i=idx),
-                "ini": idx == 0, "fin": idx == len(numeros) - 1},
+        "nav": {
+            "first": url(i=0),
+            "prev": url(i=idx - 1),
+            "next": url(i=idx + 1),
+            "last": url(i=len(numeros) - 1),
+            "actual": url(i=idx),
+            "ini": idx == 0,
+            "fin": idx == len(numeros) - 1
+        },
     })
+
     ctx["cat"] = _catalogos()
+
     return ctx
 
 
@@ -250,6 +321,168 @@ def guardar_nuevo(
 
     # 303: el navegador pasa a GET y un refresco no reenvía el formulario
     return RedirectResponse(f"/?valor={resultado['numero_pedido']}", status_code=303)
+
+
+
+@router.post("/actualizar-detalle", response_class=HTMLResponse)
+def actualizar_detalle(
+    request: Request,
+    numero_pedido: int = Form(...),
+    codigo_plu: int = Form(...),
+    nivel: int = Form(...),
+    cant: str = Form(...),
+    precio: str = Form(...),
+    precio_us: str = Form(""),
+    localizacion: str = Form(""),
+):
+    logger.info("========== INICIO ENDPOINT ACTUALIZAR DETALLE ==========")
+
+    logger.info(
+        "Formulario recibido | Pedido: %s | PLU: %s | Nivel: %s",
+        numero_pedido,
+        codigo_plu,
+        nivel,
+    )
+
+    try:
+        # 1. Convertir y construir los datos.
+        logger.info("Convirtiendo valores del formulario.")
+
+        datos_detalle = {
+            "numero_pedido": numero_pedido,
+            "codigo_plu": codigo_plu,
+            "nivel": nivel,
+            "cantidad_pedida": _a_float(cant),
+            "precio": _a_float(precio),
+            "precio_us": _a_float(precio_us),
+            "localizacion": localizacion.strip() or None,
+        }
+
+        logger.info(
+            "Datos preparados correctamente | Cantidad: %s | Precio: %s | "
+            "Precio USD: %s | Localización: %s",
+            datos_detalle["cantidad_pedida"],
+            datos_detalle["precio"],
+            datos_detalle["precio_us"],
+            datos_detalle["localizacion"],
+        )
+
+        # 2. Llamar al servicio.
+        logger.info(
+            "Llamando a PedidoService.actualizar_detalle_pedido()."
+        )
+
+        filas = PedidoService.actualizar_detalle_pedido(datos_detalle)
+
+        logger.info(
+            "Respuesta del servicio | Filas afectadas: %s",
+            filas,
+        )
+
+        if filas == 0:
+            logger.warning(
+                "El servicio no encontró el detalle | Pedido: %s | PLU: %s",
+                numero_pedido,
+                codigo_plu,
+            )
+            raise ValueError("No se encontró el detalle que deseas actualizar.")
+
+    except ValueError as error:
+        logger.warning(
+            "Error de validación al actualizar detalle | Pedido: %s | "
+            "PLU: %s | Error: %s",
+            numero_pedido,
+            codigo_plu,
+            error,
+        )
+
+        ctx = contexto_consulta("numero_pedido", str(numero_pedido), None, 0)
+        ctx["mensaje"] = str(error)
+
+        logger.info("Retornando página con mensaje de validación.")
+
+        return _pagina(request, ctx)
+
+    except SQLAlchemyError:
+        logger.exception(
+            "Error SQLAlchemy al actualizar detalle | Pedido: %s | PLU: %s",
+            numero_pedido,
+            codigo_plu,
+        )
+
+        ctx = contexto_consulta("numero_pedido", str(numero_pedido), None, 0)
+        ctx["mensaje"] = "Error al actualizar el producto."
+
+        logger.info("Retornando página con mensaje de error SQL.")
+
+        return _pagina(request, ctx)
+
+    except Exception:
+        logger.exception(
+            "Error inesperado en endpoint actualizar-detalle | Pedido: %s | PLU: %s",
+            numero_pedido,
+            codigo_plu,
+        )
+        raise
+
+    # 3. Redireccionar después de actualizar.
+    logger.info(
+        "Actualización completada correctamente. Redireccionando al pedido %s.",
+        numero_pedido,
+    )
+
+    logger.info("========== FIN ENDPOINT ACTUALIZAR DETALLE ==========")
+
+    return RedirectResponse(
+        f"/?valor={numero_pedido}",
+        status_code=303
+    )
+    
+    
+@router.post("/actualizar-detallexxxx", response_class=HTMLResponse)
+def actualizar_detalle(
+    request: Request,
+    numero_pedido: int = Form(...),
+    codigo_plu: int = Form(...),
+    nivel: int = Form(...),
+    cant: str = Form(...),
+    precio: str = Form(...),
+    precio_us: str = Form(""),
+    localizacion: str = Form(""),
+):
+    # Construimos el diccionario que necesita el servicio.
+    datos_detalle = {
+        "numero_pedido": numero_pedido,
+        "codigo_plu": codigo_plu,
+        "nivel": nivel,
+        "cantidad_pedida": _a_float(cant),
+        "precio": _a_float(precio),
+        "precio_us": _a_float(precio_us),
+        "localizacion": localizacion.strip() or None,
+    }
+
+    try:
+        filas = PedidoService.actualizar_detalle_pedido(datos_detalle)
+
+        if filas == 0:
+            raise ValueError("No se encontró el detalle que deseas actualizar.")
+
+    except ValueError as error:
+        logger.warning("Validación al actualizar detalle: %s", error)
+        ctx = contexto_consulta("numero_pedido", str(numero_pedido), None, 0)
+        ctx["mensaje"] = str(error)
+        return _pagina(request, ctx)
+
+    except SQLAlchemyError:
+        logger.exception("Error SQL al actualizar detalle")
+        ctx = contexto_consulta("numero_pedido", str(numero_pedido), None, 0)
+        ctx["mensaje"] = "Error al actualizar el producto."
+        return _pagina(request, ctx)
+
+    return RedirectResponse(
+        f"/?valor={numero_pedido}",
+        status_code=303
+    )
 
 
 @router.get("/", response_class=HTMLResponse)

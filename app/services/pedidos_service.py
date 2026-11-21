@@ -170,3 +170,147 @@ class PedidoService:
             "numero_pedido": numero_pedido,
             "total_productos": len(lista_detalles),
         }
+        
+    @staticmethod
+    def actualizar_detalle_pedido(datos_detalle: dict) -> int:
+        """
+        Actualiza un producto de un pedido existente.
+
+        No valida campos de cabecera ni aplica las validaciones
+        utilizadas para crear un pedido nuevo.
+        """
+
+        logger.info("========== INICIO ACTUALIZACIÓN DETALLE PEDIDO ==========")
+
+        try:
+            logger.info(
+                "Datos recibidos para actualizar el detalle. "
+                "Pedido: %s | PLU: %s | Nivel: %s",
+                datos_detalle.get("numero_pedido"),
+                datos_detalle.get("codigo_plu"),
+                datos_detalle.get("nivel"),
+            )
+
+            campos_actualizar = (
+                "cantidad_pedida",
+                "precio",
+                "precio_us",
+                "localizacion",
+            )
+
+            campos_identificacion = (
+                "numero_pedido",
+                "codigo_plu",
+                "nivel",
+            )
+
+            # 1. Validar campos requeridos.
+            logger.info("Validando campos requeridos.")
+
+            campos_requeridos = campos_actualizar + campos_identificacion
+
+            faltantes = [
+                campo
+                for campo in campos_requeridos
+                if campo not in datos_detalle
+            ]
+
+            if faltantes:
+                logger.warning(
+                    "Validación fallida. Campos faltantes: %s",
+                    ", ".join(faltantes),
+                )
+                raise ValueError(
+                    f"Faltan campos para actualizar el detalle: {', '.join(faltantes)}"
+                )
+
+            logger.info("Validación de campos requeridos completada.")
+
+            # 2. Validar identificadores.
+            logger.info("Validando identificadores del detalle.")
+
+            if not datos_detalle["numero_pedido"]:
+                logger.warning("El número de pedido está vacío.")
+                raise ValueError("El número de pedido es obligatorio.")
+
+            if not datos_detalle["codigo_plu"]:
+                logger.warning("El código PLU está vacío.")
+                raise ValueError("El código PLU es obligatorio.")
+
+            if datos_detalle["nivel"] is None:
+                logger.warning("El nivel de limpieza es nulo.")
+                raise ValueError("El nivel de limpieza es obligatorio.")
+
+            logger.info(
+                "Identificadores validados correctamente. "
+                "Pedido: %s | PLU: %s | Nivel: %s",
+                datos_detalle["numero_pedido"],
+                datos_detalle["codigo_plu"],
+                datos_detalle["nivel"],
+            )
+
+            # 3. Iniciar transacción.
+            logger.info("Iniciando transacción con la base de datos.")
+
+            with Conexion.transaccion() as connection:
+
+                logger.info("Conexión y transacción iniciadas correctamente.")
+
+                # 4. Instanciar repositorio.
+                logger.info("Instanciando PedidoDetalleRepository.")
+
+                detalle_repo = PedidoDetalleRepository(connection)
+
+                # 5. Ejecutar actualización.
+                logger.info(
+                    "Ejecutando actualización. Pedido: %s | PLU: %s | Nivel: %s",
+                    datos_detalle["numero_pedido"],
+                    datos_detalle["codigo_plu"],
+                    datos_detalle["nivel"],
+                )
+
+                filas = detalle_repo.actualizar_detalle_pedido(datos_detalle)
+
+                logger.info(
+                    "Resultado de actualización. Filas afectadas: %s",
+                    filas,
+                )
+
+                # 6. Validar resultado.
+                if filas == 0:
+                    logger.warning(
+                        "No se encontró el detalle. "
+                        "Pedido: %s | PLU: %s | Nivel: %s",
+                        datos_detalle["numero_pedido"],
+                        datos_detalle["codigo_plu"],
+                        datos_detalle["nivel"],
+                    )
+
+                    raise ValueError(
+                        "No se encontró el producto del pedido que se desea actualizar."
+                    )
+
+                logger.info(
+                    "Detalle actualizado correctamente. "
+                    "Pedido: %s | PLU: %s | Filas afectadas: %s",
+                    datos_detalle["numero_pedido"],
+                    datos_detalle["codigo_plu"],
+                    filas,
+                )
+
+                logger.info("========== FIN ACTUALIZACIÓN DETALLE PEDIDO ==========")
+
+                return filas
+
+        except ValueError as e:
+            logger.warning(
+                "Validación o actualización no realizada: %s",
+                str(e),
+            )
+            raise
+
+        except Exception:
+            logger.exception(
+                "Error inesperado durante la actualización del detalle del pedido."
+            )
+            raise

@@ -54,9 +54,11 @@
         <img src="https://cdn-icons-png.flaticon.com/512/10608/10608883.png" alt="Agregar" class="icono-btn">
       </a>
 
-      <button class="btn" disabled title="Disponible en la siguiente etapa" aria-label="Editar">
+      {% if modo == "consulta" %}
+      <button class="btn" type="button" id="btn-editar" title="Editar producto seleccionado" aria-label="Editar">
         <img src="https://cdn-icons-png.flaticon.com/512/9196/9196327.png" alt="Editar" class="icono-btn">
       </button>
+      {% endif %}
 
       <button class="btn" onclick="window.print()" aria-label="Imprimir" title="Imprimir">
         <img src="https://cdn-icons-png.flaticon.com/512/7138/7138143.png" alt="Imprimir" class="icono-btn">
@@ -77,7 +79,18 @@
     {# CAMBIO: tipo numérico solo en nuevo; en consulta se queda "text" porque el valor viene formateado con fmt #}
     {% set tnum = 'number' if modo == 'nuevo' else 'text' %}
 
-    <form class="main" id="form-pedido" {% if modo=="nuevo" %}method="POST" action="/nuevo" {% endif %}>
+
+    <form class="main" id="form-pedido" method="POST"
+      action="{% if modo == 'nuevo' %}/nuevo{% else %}/actualizar-detalle{% endif %}">
+
+      {% if modo == "consulta" %}
+      <input type="hidden" name="numero_pedido" value="{{ numero_pedido }}">
+      <input type="hidden" name="codigo_plu" value="{{ sel.plu }}">
+      <input type="hidden" name="nivel" value="{{ sel.nivel }}">
+      <input type="hidden" name="localizacion" value="{{ sel.localizacion }}">
+      {% endif %}
+      <!--     
+    <form class="main" id="form-pedido" {% if modo=="nuevo" %}method="POST" action="/nuevo" {% endif %}> -->
 
       <div class="card">
         <div class="form">
@@ -192,19 +205,17 @@
           <!-- Precio compra -->
           <div class="f c2">
             <label>Precio Compra</label>
-
-            <input class="num" name="precio" type="number" step="any"
-              value="{{ sel.precio if sel.precio is not none else '' }}" {% if modo=="nuevo" %}required{% endif %} {% if
-              modo=="consulta" %}readonly{% endif %}>
+            <input class="num" name="precio" id="precio" type="number" step="any"
+              value="{{ sel.precio if sel.precio is not none else '' }}" {% if modo=="nuevo" %}required{% else
+              %}readonly{% endif %}>
           </div>
 
 
           <!-- Precio US -->
           <div class="f c2">
             <label>Precio US</label>
-            {# CAMBIO: name, type; editable solo en nuevo #}
-            <input class="num" name="precio_us" type="{{ tnum }}" step="any"
-              value="{{ sel.us | fmt if sel.us is not none else '' }}" {% if modo=="consulta" %}readonly{% endif %}>
+            <input class="num" name="precio_us" id="precio_us" type="number" step="any"
+              value="{{ sel.us if sel.us is not none else '' }}" readonly>
           </div>
 
           <!-- Bodega destino -->
@@ -243,11 +254,8 @@
           <!-- Cantidad -->
           <div class="f c6">
             <label>Cantidad</label>
-            {% if modo == "nuevo" %}
-            <input class="num" name="cant" type="number" step="any" min="0" required value="">
-            {% else %}
-            <input class="num" name="cant" value="{{ sel.qty | fmt if sel.qty is not none else '' }}" readonly>
-            {% endif %}
+            <input class="num" name="cant" id="cant" type="number" step="any" min="0"
+              value="{{ sel.qty if sel.qty is not none else '' }}" {% if modo !="nuevo" %}readonly{% endif %}>
           </div>
 
         </div>
@@ -370,8 +378,8 @@
         🚚 Crear solicitud
       </button>
       {% else %}
-      <button class="btn primary" disabled title="Disponible en la siguiente etapa">
-        🚚 Create shipment
+      <button class="btn primary" type="button" id="btn-guardar-cambios" disabled>
+        Guardar cambios
       </button>
       {% endif %}
 
@@ -429,6 +437,48 @@
       });
       plu.addEventListener("blur", buscarNombre);
     })();
+  </script>
+  {% endif %}
+  {% if modo == "consulta" %}
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+      const btnEditar = document.getElementById("btn-editar");
+      const btnGuardar = document.getElementById("btn-guardar-cambios");
+      const formulario = document.getElementById("form-pedido");
+
+      const campos = [
+        document.getElementById("cant"),
+        document.getElementById("precio"),
+        document.getElementById("precio_us")
+      ];
+
+      let editando = false;
+
+      btnEditar.addEventListener("click", function () {
+
+        if (editando) return;
+
+        campos.forEach(campo => {
+          campo.readOnly = false;
+        });
+
+        btnGuardar.disabled = false;
+        btnEditar.disabled = true;
+
+        editando = true;
+      });
+
+      btnGuardar.addEventListener("click", function () {
+
+        if (!editando) return;
+
+        if (!formulario.reportValidity()) return;
+
+        formulario.submit();
+      });
+
+    });
   </script>
   {% endif %}
 </body>
