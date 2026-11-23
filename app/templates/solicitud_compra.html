@@ -336,6 +336,19 @@
     <div class="card grid">
 
       <div class="gtools">
+
+        {# Motivo por el que ✎ y 🗑 estarían deshabilitados (vacío = habilitados) #}
+        {% if modo != "consulta" or not numero %}
+        {% set motivo = "No hay un pedido cargado" %}
+        {% elif not puede_agregar %}
+        {% set motivo = "Solo pedidos en estado Pendiente (estado actual: " ~ c.estado ~ ")" %}
+        {% elif not sel.plu %}
+        {% set motivo = "El pedido no tiene productos" %}
+        {% else %}
+        {% set motivo = "" %}
+        {% endif %}
+        {% set puede_editar = (motivo == "") %}
+
         {# + : agregar productos #}
         {% if pedido %}
         <button class="btn" type="submit" form="form-pedido" title="Agregar producto al pedido {{ pedido }}"
@@ -348,28 +361,21 @@
           title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'Primero cree el pedido' }}">+</button>
         {% endif %}
 
-        {# ✎ : editar la línea seleccionada (solo en consulta y pedido pendiente) #}
-        {% if modo == "consulta" and numero and puede_agregar and sel.plu %}
-        <button class="btn" type="button" id="btn-editar" title="Editar la línea seleccionada"
-          aria-label="Editar línea">✎</button>
-        {% else %}
-        <button class="btn" type="button" id="btn-editar" disabled
-          title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'No disponible' }}"
-          aria-label="Editar línea">✎</button>
-        {% endif %}
-
+        {# ✎ : editar la línea seleccionada #}
+        <button class="btn" type="button" id="btn-editar" aria-label="Editar línea"
+          title="{{ 'Editar la línea seleccionada' if puede_editar else motivo }}" {% if not puede_editar %}disabled{%
+          endif %}>✎</button>
 
         {# 🗑 : eliminar la línea seleccionada #}
         {% if puede_editar %}
         <button class="btn peligro" type="submit" form="form-pedido" formaction="/eliminar-detalle" formmethod="post"
           formnovalidate onclick="return confirm('¿Eliminar el PLU {{ sel.plu }} del pedido {{ numero }}?')"
           title="Eliminar la línea seleccionada" aria-label="Eliminar línea">
-          <img src="/static/img/papelera.png" alt="Eliminar" class="icono-btn">
+          <img src="/static/css/img/borrar.png" alt="Eliminar" class="icono-btn">
         </button>
         {% else %}
-        <button class="btn" type="button" disabled aria-label="Eliminar línea"
-          title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'No disponible' }}">
-          <img src="/static/img/papelera.png" alt="Eliminar" class="icono-btn">
+        <button class="btn" type="button" disabled aria-label="Eliminar línea" title="{{ motivo }}">
+          <img src="/static/css/img/borrar.png" alt="Eliminar" class="icono-btn">
         </button>
         {% endif %}
       </div>

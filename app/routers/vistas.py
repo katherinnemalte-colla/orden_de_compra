@@ -55,6 +55,11 @@ def _catalogos() -> dict:
 def _pagina(request: Request, ctx: dict) -> HTMLResponse:
     return templates.TemplateResponse(request, "solicitud_compra.html", ctx)
 
+MENSAJES_OK = {
+    "creado": "Pedido {n} creado. Ya puede agregar más productos.",
+    "agregado": "Producto agregado al pedido {n}.",
+    "actualizado": "El producto ya estaba en el pedido {n}: se actualizó la línea.",
+}
 
 
 # ============================================================ contexto
@@ -309,7 +314,7 @@ def agregar_linea(
     }
 
     try:
-        PedidoService.agregar_detalle(pedido, detalle)
+        resultado = PedidoService.agregar_detalle(pedido, detalle)
 
     except ProductoDuplicado as error:   # va antes que ValueError
         return _agregar_con_error(request, pedido, str(error), 409, codigo_plu, nivel, aviso=True)
@@ -332,8 +337,7 @@ def agregar_linea(
         logger.exception("Error inesperado al agregar producto")
         return _agregar_con_error(request, pedido, "Ocurrió un error inesperado al agregar el producto.",
                                   500, codigo_plu, nivel)
-
-    return RedirectResponse(f"/nuevo?pedido={pedido}&ok=agregado", status_code=303)
+    return RedirectResponse(f"/nuevo?pedido={pedido}&ok={resultado['accion']}", status_code=303)
 
 def _a_float(valor: str) -> float:
     valor = (valor or "").strip().replace(",", ".")
@@ -536,51 +540,48 @@ def actualizar_detalle(
         status_code=303
     )
     
-    
-@router.post("/actualizar-detallexxxx", response_class=HTMLResponse)
-def actualizar_detalle(
+@router.post("/eliminar-detalle", response_class=HTMLResponse)
+def eliminar_detalle(
     request: Request,
     numero_pedido: int = Form(...),
     codigo_plu: int = Form(...),
     nivel: int = Form(...),
-    cant: str = Form(...),
-    precio: str = Form(...),
-    precio_us: str = Form(""),
     localizacion: str = Form(""),
 ):
-    # Construimos el diccionario que necesita el servicio.
     datos_detalle = {
         "numero_pedido": numero_pedido,
         "codigo_plu": codigo_plu,
         "nivel": nivel,
-        "cantidad_pedida": _a_float(cant),
-        "precio": _a_float(precio),
-        "precio_us": _a_float(precio_us),
         "localizacion": localizacion.strip() or None,
     }
+    logger.info("Eliminar detalle | pedido=%s plu=%s nivel=%s", numero_pedido, codigo_plu, nivel)
 
     try:
-        filas = PedidoService.actualizar_detalle_pedido(datos_detalle)
+        filas = PedidoService.eliminar_detalle(datos_detalle)
 
         if filas == 0:
-            raise ValueError("No se encontró el detalle que deseas actualizar.")
+            raise ValueError("No se encontró el producto que deseas eliminar.")
 
     except ValueError as error:
-        logger.warning("Validación al actualizar detalle: %s", error)
+        logger.warning("Validación al eliminar detalle: %s", error)
         ctx = contexto_consulta("numero_pedido", str(numero_pedido), None, 0)
         ctx["mensaje"] = str(error)
         return _pagina(request, ctx)
 
     except SQLAlchemyError:
-        logger.exception("Error SQL al actualizar detalle")
+        logger.exception("Error SQL al eliminar detalle")
         ctx = contexto_consulta("numero_pedido", str(numero_pedido), None, 0)
-        ctx["mensaje"] = "Error al actualizar el producto."
+        ctx["mensaje"] = "Error al eliminar el producto."
         return _pagina(request, ctx)
 
-    return RedirectResponse(
-        f"/?valor={numero_pedido}",
-        status_code=303
-    )
+    except Exception:
+        logger.exception("Error inesperado al eliminar detalle")
+        ctx = contexto_consulta("numero_pedido", str(numero_pedido), None, 0)
+        ctx["mensaje"] = "Ocurrió un error inesperado al eliminar el producto."
+        return _pagina(request, ctx)
+
+    # 303: la consulta se recarga y la grilla y el gráfico quedan actualizados
+    return RedirectResponse(f"/?valor={numero_pedido}", status_code=303)
 
 
 @router.get("/", response_class=HTMLResponse)

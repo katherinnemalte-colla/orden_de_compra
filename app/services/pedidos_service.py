@@ -123,8 +123,8 @@ class PedidoService:
 
         for detalle in lista_detalles:
             detalle.setdefault("precio_us", 0)
-            detalle.setdefault("localizacion", None)
             detalle.setdefault("numero_lote", None)
+            detalle["localizacion"] = cabecera.get("bodega_destino")
 
         # 2. Validar (con los datos ya completos).
         PedidoService._validar_cabecera(cabecera)
@@ -324,38 +324,107 @@ class PedidoService:
     ESTADOS_NO_PENDIENTES = (3, 4, 9)
 
     @staticmethod
-    def es_pendiente(estado) -> bool:
-        return estado not in PedidoService.ESTADOS_NO_PENDIENTES
+    def _norm_bodega(valor) -> str:
+        """'01', ' 1 ' y 1 se consideran la misma bodega."""
+        texto = str(valor if valor is not None else "").strip()
+        return texto.lstrip("0") or ("0" if texto else "")
 
     @staticmethod
     def agregar_detalle(numero_pedido: int, detalle: dict) -> dict:
-        """Agrega un producto a un pedido existente (sin consecutivo)."""
+        """
+        RF-04: agrega una línea a un pedido pendiente.
+        - La bodega del pedido se asigna al producto.
+        - Si ya existe producto + nivel + bodega, se ACTUALIZA en lugar de duplicar.
+        """
         d = detalle.copy()
         d.setdefault("precio_us", 0)
-        d.setdefault("localizacion", None)
         d.setdefault("numero_lote", None)
 
-        # Mismas validaciones que al crear.
         PedidoService._validar_detalles([d])
+
         datos = pedidos_repository.cargar_pedido(numero_pedido)
         if datos is None:
             raise ValueError("El pedido no existe.")
 
-        if not PedidoService.es_pendiente(datos["cabecera"]["estdo"]):
+        cab = datos["cabecera"]
+        if not PedidoService.es_pendiente(cab["estdo"]):
             raise ValueError(
                 "Solo se pueden agregar productos a pedidos en estado Pendiente."
             )
 
-        # ¿Ya está el producto? (misma regla que _validar_detalles: PLU + nivel)
-        plu, nivel = int(d["codigo_plu"]), str(d["nivel"]).strip()
-        for f in datos["lineas"]:
-            if int(f["cdgo_plu"]) == plu and str(f["tpo_lmpza"]).strip() == nivel:
-                raise ProductoDuplicado("Producto ya ingresado.")
+        # La bodega elegida en el pedido se asigna a todos los productos.
+        bodega = cab["bdga_dstno"]
+        d["localizacion"] = bodega
+        d["numero_pedido"] = numero_pedido
 
+        plu = int(d["codigo_plu"])
+        nivel = str(d["nivel"]).strip()
+        clave_bodega = PedidoService._norm_bodega(bodega)
+
+        # ¿Ya existe la misma línea? producto + nivel + bodega
+        existente = next(
+            (
+                f for f in datos["lineas"]
+                if int(f["cdgo_plu"]) == plu
+                and str(f["tpo_lmpza"]).strip() == nivel
+                and PedidoService._norm_bodega(f["lclzcion"]) == clave_bodega
+            ),
+            None,
+        )
+
+        if existente is not None:
+            # Actualizar en lugar de duplicar.
+            filas = PedidoService.actualizar_detalle_pedido({
+                "numero_pedido": numero_pedido,
+                "codigo_plu": plu,
+                "nivel": int(d["nivel"]),
+                "cantidad_pedida": d["cantidad_pedida"],
+                "precio": d["precio"],
+                "precio_us": d["precio_us"],
+                "localizacion": existente["lclzcion"],   # tal como está guardada
+            })
+            logger.info("Línea actualizada | pedido=%s plu=%s nivel=%s filas=%r",
+                        numero_pedido, plu, nivel, filas)
+            if filas == 0:
+                raise RuntimeError(f"No fue posible actualizar el PLU {plu}.")
+            return {"exito": True, "accion": "actualizado", "numero_pedido": numero_pedido}
+
+        # No existe: insertar.
         with Conexion.transaccion() as connection:
-            d["numero_pedido"] = numero_pedido
             filas = PedidoDetalleRepository(connection).insertar_detalle_pedido(d)
+            logger.info("Línea agregada | pedido=%s plu=%s nivel=%s filas=%r",
+                        numero_pedido, plu, nivel, filas)
             if filas != 1:
                 raise RuntimeError(f"No fue posible insertar el PLU {plu}.")
 
-        return {"exito": True, "numero_pedido": numero_pedido}
+        return {"exito": True, "accion": "agregado", "numero_pedido": numero_pedido}
+    
+    
+    @staticmethod
+    def es_pendiente(estado) -> bool:
+        return estado not in PedidoService.ESTADOS_NO_PENDIENTES
+
+
+    
+    @staticmethod
+    def eliminar_detalle(datos: dict) -> int:
+        """Elimina una línea de un pedido pendiente. Devuelve las filas afectadas."""
+        datos_pedido = pedidos_repository.cargar_pedido(int(datos["numero_pedido"]))
+        if datos_pedido is None:
+            raise ValueError("El pedido no existe.")
+
+        if not PedidoService.es_pendiente(datos_pedido["cabecera"]["estdo"]):
+            raise ValueError(
+                "Solo se pueden eliminar productos de pedidos en estado Pendiente."
+            )
+
+        with Conexion.transaccion() as connection:
+            filas = PedidoDetalleRepository(connection).eliminar_detalle_pedido(
+            int(datos["numero_pedido"]),
+            codigo_plu=int(datos["codigo_plu"]),
+            nivel=int(datos["nivel"]),
+            )
+            #filas = PedidoDetalleRepository(connection).eliminar_detalle_pedido(datos)
+            logger.info("Detalle eliminado | pedido=%s filas=%r", datos["numero_pedido"], filas)
+
+        return filas
