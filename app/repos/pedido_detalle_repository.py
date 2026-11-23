@@ -1,8 +1,9 @@
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
+import socket
 
-
+#nombre_equipo = socket.gethostname()
 class PedidoDetalleRepository:
     """
     Repositorio encargado de las operaciones sobre los detalles
@@ -243,7 +244,7 @@ class PedidoDetalleRepository:
             "fecha_pedido": datos_precio["fecha_pedido"],
             "precio": precio_nuevo,
             "fecha_reporte": datos_precio["fecha_reporte"],
-            "operador": datos_precio["operador"],
+            "operador": f"{datos_precio['usuario']} - {nombre_equipo}",
         }
 
         resultado_insert = self.connection.execute(

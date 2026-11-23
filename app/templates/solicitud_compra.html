@@ -355,7 +355,8 @@
           aria-label="Agregar producto">+</button>
         {% elif modo == "consulta" and numero and puede_agregar %}
         <a class="btn" href="/nuevo?pedido={{ numero }}" title="Agregar productos a este pedido"
-          aria-label="Agregar producto">+</a>
+          aria-label="Agregar producto">
+        <img src="/static/css/img/anadir.png" alt="Eliminar" class="icono-btn"></a>
         {% else %}
         <button class="btn" disabled aria-label="Agregar producto"
           title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'Primero cree el pedido' }}">+</button>
@@ -364,7 +365,8 @@
         {# ✎ : editar la línea seleccionada #}
         <button class="btn" type="button" id="btn-editar" aria-label="Editar línea"
           title="{{ 'Editar la línea seleccionada' if puede_editar else motivo }}" {% if not puede_editar %}disabled{%
-          endif %}>✎</button>
+          endif %}>
+        <img src="/static/css/img/editar.png" alt="Eliminar" class="icono-btn"></button>
 
         {# 🗑 : eliminar la línea seleccionada #}
         {% if puede_editar %}
