@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from app.services.pedidos_service import PedidoService
 @router.get("")
 def buscar(

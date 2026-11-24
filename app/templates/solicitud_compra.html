@@ -31,7 +31,27 @@
         <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.first }}" aria-label="Primero">⏮</a>
         <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.prev }}" aria-label="Anterior">◀</a>
 
-        <input class="btn num" name="valor" value="{{ valor }}" inputmode="numeric" aria-label="Valor a buscar">
+        <input class="btn num" id="valor-txt" name="valor" value="{{ valor }}" inputmode="numeric"
+          aria-label="Valor a buscar" {% if campo=="estado" %}hidden disabled{% endif %}>
+
+        <select class="btn" id="valor-est" name="valor" aria-label="Estado" {% if campo !="estado" %}hidden disabled{%
+          endif %}>
+          <option value="">Todos</option>
+          {% for e in estados_opciones %}
+          <option value="{{ e }}" {% if e==valor %}selected{% endif %}>{{ e }}</option>
+          {% endfor %}
+        </select>
+
+        <script>
+          const selCampo = document.querySelector('select[name="campo"]');
+          const txt = document.getElementById('valor-txt');
+          const est = document.getElementById('valor-est');
+          selCampo.addEventListener('change', () => {
+            const esEstado = selCampo.value === 'estado';
+            txt.hidden = txt.disabled = esEstado;
+            est.hidden = est.disabled = !esEstado;
+          });
+        </script>
 
         <button class="btn" type="submit" aria-label="Buscar">🔍</button>
 
@@ -46,7 +66,7 @@
 
       {% if modo == "consulta" %}
       <a class="btn" href="{{ nav.actual }}" aria-label="Actualizar" title="Actualizar">
-        <img src="https://cdn-icons-png.flaticon.com/512/3580/3580304.png" alt="Actualizar" class="icono-btn">
+        <img src="/static/css/img/reiniciar.png" alt="Eliminar" class="icono-btn">
       </a>
       {% endif %}
 
@@ -56,7 +76,7 @@
 
       {% if modo == "consulta" %}
       <button class="btn" type="button" id="btn-editar" title="Editar producto seleccionado" aria-label="Editar">
-        <img src="https://cdn-icons-png.flaticon.com/512/9196/9196327.png" alt="Editar" class="icono-btn">
+        <img src="/static/css/img/editar.png" alt="Eliminar" class="icono-btn">
       </button>
       {% endif %}
 
@@ -356,7 +376,7 @@
         {% elif modo == "consulta" and numero and puede_agregar %}
         <a class="btn" href="/nuevo?pedido={{ numero }}" title="Agregar productos a este pedido"
           aria-label="Agregar producto">
-        <img src="/static/css/img/anadir.png" alt="Eliminar" class="icono-btn"></a>
+          <img src="/static/css/img/anadir.png" alt="Eliminar" class="icono-btn"></a>
         {% else %}
         <button class="btn" disabled aria-label="Agregar producto"
           title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'Primero cree el pedido' }}">+</button>
@@ -366,7 +386,7 @@
         <button class="btn" type="button" id="btn-editar" aria-label="Editar línea"
           title="{{ 'Editar la línea seleccionada' if puede_editar else motivo }}" {% if not puede_editar %}disabled{%
           endif %}>
-        <img src="/static/css/img/editar.png" alt="Eliminar" class="icono-btn"></button>
+          <img src="/static/css/img/editar.png" alt="Eliminar" class="icono-btn"></button>
 
         {# 🗑 : eliminar la línea seleccionada #}
         {% if puede_editar %}

@@ -15,13 +15,20 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app.conexion import Conexion
 from app.plantillas import templates
 from app.repos import pedidos_repository
+from app.repos.pedidos_repository import ESTADOS_GRUPOS
 from app.repos.catalogos_repository import CatalogosRepository as Catalogos
 from app.services.pedidos_service import PedidoService,ProductoDuplicado
+
+CAMPOS = {
+    "numero_pedido": "Pedido No",
+    "estado": "Estado",
+}
+ESTADOS_OPCIONES = list(ESTADOS_GRUPOS)      # ["SIN RECIBIR", "RECIBIDO", "ANULADO"]
 router = APIRouter(include_in_schema=False)
 
 logger = logging.getLogger(__name__)
 IVA = 0.19  # ajustar al IVA real
-CAMPOS = {"numero_pedido": "Pedido No", "proveedor": "Proveedor", "orden_compra": "Orden de Compra"}
+CAMPOS = {"numero_pedido": "Pedido No","estado": "Estado",}
 MSG_VACIO = "No se encontró información para mostrar."
 
 
@@ -37,10 +44,6 @@ def _txt(v) -> str:
 def _clase_estado(e) -> str:
     return "anu" if e == 9 else "rec" if e in (3, 4) else "pend"
 
-
-def _tipo_pedido(tpo_prvdor) -> int:
-    """Regla del FoxPro: sin dato -> 0, tpo_prvdor 4 -> Internacional (2), otro -> Nacional (1)."""
-    return 0 if tpo_prvdor is None else 2 if tpo_prvdor == 4 else 1
 
 
 def _catalogos() -> dict:
@@ -70,7 +73,7 @@ def _contexto(modo: str = "consulta", campo: str = "numero_pedido", valor: str =
         "campos": CAMPOS, "campo": campo, "valor": valor, "mensaje": mensaje,
         "cat": {}, "c": {}, "sel": {}, "lineas": [], "bars": [], "steps": [],
         "cost": 0, "total_iva": 0, "margin": 0, "contador": "",
-        "pedido": None, "puede_agregar": False,
+        "pedido": None, "puede_agregar": False,"estados_opciones": ESTADOS_OPCIONES,
         "nav": {"first": "#", "prev": "#", "next": "#", "last": "#", "actual": "/",
                 "ini": True, "fin": True},
     }
@@ -79,11 +82,12 @@ def _contexto(modo: str = "consulta", campo: str = "numero_pedido", valor: str =
 def _cabecera(cab: dict) -> dict:
     return {
         "estdo": cab["estdo"], "estado": cab["estado_nombre"], "estado_clase": _clase_estado(cab["estdo"]),
+        "estado_txt": pedidos_repository.estado_texto(cab["estdo"]),   # <-- aquí
         "prov": _txt(cab["idntfccion"]), "fped": _dia(cab["fcha_pddo"]), "fpac": _dia(cab["fcha_pctda"]),
         "tipo": 2 if cab["tpo_ped"] == 2 else 1, "oc": _txt(cab["orden_cmpra_int"]),
         "lote": _txt(cab["lte_int"]), "trm": cab["trm"], "bod": _txt(cab["bdga_dstno"]),
         "reg": _txt(cab["realizado"]),
-        "fcha_recibido": (cab["fcha_recibido"]),
+        "fcha_recibido": cab["fcha_recibido"],
     }
 
 
@@ -156,12 +160,16 @@ def contexto_consulta(
     campo = campo if campo in CAMPOS else "numero_pedido"
     valor = valor.strip()
 
-    if valor and not valor.isdigit():
-        return _contexto(modo, campo, valor, "Ingresa solo números.")
+    if campo == "estado":
+        if valor and valor not in ESTADOS_GRUPOS:
+            return _contexto(modo, campo, "", "Estado no válido.")
+        filtros = {"estados": ESTADOS_GRUPOS[valor]} if valor else {}
+    else:
+        if valor and not valor.isdigit():
+            return _contexto(modo, campo, valor, "Ingresa solo números.")
+        filtros = {campo: int(valor)} if valor else {}
 
-    numeros = pedidos_repository.buscar_numeros(
-        **({campo: int(valor)} if valor else {})
-    )
+    numeros = pedidos_repository.buscar_numeros(**filtros)
 
     if not numeros:
         return _contexto(modo, campo, valor, MSG_VACIO)

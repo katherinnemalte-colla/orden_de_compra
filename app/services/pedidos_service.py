@@ -7,10 +7,24 @@ from app.repos import pedidos_repository
 from app.repos.pedido_detalle_repository import PedidoDetalleRepository
 from app.repos.consecutivo_repository import ConsecutivoRepository
 from sqlalchemy import text
+
 logger = logging.getLogger(__name__)
+
 class ProductoDuplicado(ValueError):
         """El PLU (con ese nivel) ya está en el pedido."""
 class PedidoService:
+    @staticmethod
+    def es_pendiente(estado) -> bool:
+        return estado not in PedidoService.ESTADOS_NO_PENDIENTES
+    
+    @staticmethod
+    def _operador(usuario: str, terminal: str = "") -> str:
+        """Mismo formato que 'REGISTRADO POR': usuario - terminal."""
+        return f"{usuario} - {terminal}" if terminal else str(usuario)
+
+    @staticmethod
+    def _fecha_servidor(connection):
+        return connection.execute(text("SELECT GETDATE()")).scalar_one()
     
     @staticmethod
     def _validar_cabecera(datos: dict) -> None:
@@ -111,7 +125,7 @@ class PedidoService:
             combinaciones.add(clave)
 
     @staticmethod
-    def crear_pedido(datos_pedido: dict, detalles: list[dict]) -> dict:
+    def crear_pedido(datos_pedido: dict, detalles: list[dict], terminal: str = "") -> dict:
 
         # 1. Copiar y completar ANTES de validar.
         cabecera = datos_pedido.copy()
@@ -157,16 +171,22 @@ class PedidoService:
             logger.info("DEBUG 4: filas cabecera = %r", filas)
             if filas != 1:
                 raise RuntimeError("No fue posible insertar la cabecera del pedido.")
-
             for detalle in lista_detalles:
                 detalle["numero_pedido"] = numero_pedido
                 filas = detalle_repo.insertar_detalle_pedido(detalle)
-                logger.info("DEBUG 5: filas detalle PLU %s = %r", detalle["codigo_plu"], filas)
                 if filas != 1:
-                    raise RuntimeError(
-                        f"No fue posible insertar el PLU {detalle['codigo_plu']}."
-                    )
+                    raise RuntimeError(f"No fue posible insertar el PLU {detalle['codigo_plu']}.")
 
+                # Historial de precios (solo cantidad > 0)
+                if float(detalle["cantidad_pedida"]) > 0:
+                    detalle_repo.registrar_variacion_precio(
+                        codigo_proveedor=cabecera["codigo_proveedor"],
+                        codigo_plu=detalle["codigo_plu"],
+                        precio=detalle["precio"],
+                        fecha_pedido=cabecera["fecha_pedido"],
+                        fecha_servidor=cabecera["fecha_servidor"],   # el GETDATE() que ya obtienes
+                        operador=PedidoService._operador(cabecera["usuario"], terminal),
+                    )
         return {
             "exito": True,
             "mensaje": "Pedido creado correctamente.",
@@ -175,15 +195,17 @@ class PedidoService:
         }
         
     @staticmethod
-    def actualizar_detalle_pedido(datos_detalle: dict) -> int:
-        """
-        Actualiza un producto de un pedido existente.
+    def actualizar_detalle_pedido(datos_detalle: dict, terminal: str = "") -> int:
+        numero_pedido = int(datos_detalle["numero_pedido"])
 
-        No valida campos de cabecera ni aplica las validaciones
-        utilizadas para crear un pedido nuevo.
-        """
+        pedido = pedidos_repository.cargar_pedido(numero_pedido)
+        if pedido is None:
+            raise ValueError("El pedido no existe.")
 
-        logger.info("========== INICIO ACTUALIZACIÓN DETALLE PEDIDO ==========")
+        cab = pedido["cabecera"]
+        if not PedidoService.es_pendiente(cab["estdo"]):
+            raise ValueError("Solo se pueden modificar pedidos en estado Pendiente.")
+
 
         try:
             logger.info(
@@ -292,6 +314,16 @@ class PedidoService:
                     raise ValueError(
                         "No se encontró el producto del pedido que se desea actualizar."
                     )
+                    
+                if filas and float(datos_detalle["cantidad_pedida"]) > 0:
+                   detalle_repo.registrar_variacion_precio(
+                        codigo_proveedor=cab["idntfccion"],
+                        codigo_plu=int(datos_detalle["codigo_plu"]),
+                        precio=datos_detalle["precio"],
+                        fecha_pedido=cab["fcha_pddo"],
+                        fecha_servidor=PedidoService._fecha_servidor(connection),
+                        operador=PedidoService._operador(os.getenv("APP_USUARIO", "SIN-LOGIN"), terminal),
+                    )
 
                 logger.info(
                     "Detalle actualizado correctamente. "
@@ -318,8 +350,6 @@ class PedidoService:
             )
             raise
 
-# Dentro de la clase PedidosService:
-    
     # Igual que _clase_estado() en vistas.py: 9 anulado, 3 y 4 recibido; el resto, pendiente.
     ESTADOS_NO_PENDIENTES = (3, 4, 9)
 
@@ -398,13 +428,6 @@ class PedidoService:
                 raise RuntimeError(f"No fue posible insertar el PLU {plu}.")
 
         return {"exito": True, "accion": "agregado", "numero_pedido": numero_pedido}
-    
-    
-    @staticmethod
-    def es_pendiente(estado) -> bool:
-        return estado not in PedidoService.ESTADOS_NO_PENDIENTES
-
-
     
     @staticmethod
     def eliminar_detalle(datos: dict) -> int:

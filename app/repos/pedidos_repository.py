@@ -3,7 +3,26 @@ from datetime import date, timedelta
 
 from app.conexion import Conexion
 
-ESTADOS = {2: "PENDIENTE", 4: "RECIBIDO", 9: "ANULADO"}
+# Textos quemados de los estados
+ESTADO_TEXTO = {
+    0: "SIN RECIBIR",
+    1: "SIN RECIBIR",
+    2: "SIN RECIBIR",   # estado inicial de un pedido nuevo
+    3: "RECIBIDO",
+    4: "RECIBIDO",
+    9: "ANULADO",
+}
+
+# Grupo de texto -> números de estado en BD
+ESTADOS_GRUPOS = {
+    "SIN RECIBIR": (0, 1, 2),
+    "RECIBIDO": (3, 4),
+    "ANULADO": (9,),
+}
+
+
+def estado_texto(estdo: int | None) -> str:
+    return ESTADO_TEXTO.get(estdo, "—")
 
 
 def _rango_dia(campo: str, nombre: str, dia: date, where: list, params: dict) -> None:
@@ -21,6 +40,7 @@ def buscar_numeros(
     solo_pendientes: bool = False,
     lote_int: int | None = None,
     orden_compra: int | None = None,
+    estados: tuple[int, ...] | None = None,
 ) -> list[int]:
     """Lista de números de pedido que cumplen los filtros (para el navegador)."""
     where = ["1=1"]
@@ -44,7 +64,14 @@ def buscar_numeros(
     if orden_compra:
         where.append("orden_cmpra_int = :orden_compra")
         params["orden_compra"] = orden_compra
-
+        
+    if estados:
+        nombres = []                      # 1. lista vacía donde guardo los placeholders
+        for n, e in enumerate(estados):   # 2. recorre los estados: (0, 0), (1, 1), (2, 2)
+            nombres.append(f":est{n}")    # 3. agrega ":est0", ":est1", ":est2"
+            params[f"est{n}"] = e         # 4. guarda el valor real: est0=0, est1=1, est2=2
+        where.append(f"estdo IN ({', '.join(nombres)})")
+    
     sql = (
         "SELECT nmro_pddo FROM pddos_prvdor WHERE "
         + " AND ".join(where)
@@ -86,5 +113,5 @@ def cargar_pedido(numero_pedido: int) -> dict | None:
     )
 
     cabecera = cab[0]
-    cabecera["estado_nombre"] = ESTADOS.get(cabecera["estdo"], f"ESTADO {cabecera['estdo']}")
+    cabecera["estado_nombre"] = ESTADO_TEXTO.get(cabecera["estdo"], f"ESTADO_TEXTO {cabecera['estdo']}")
     return {"cabecera": cabecera, "lineas": lineas}
