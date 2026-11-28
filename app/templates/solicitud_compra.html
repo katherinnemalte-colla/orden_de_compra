@@ -274,17 +274,23 @@
             <label>Precio Compra</label>
 
             <div class="campo-moneda">
+
               <input class="num" name="precio" id="precio" type="number" step="any" min="0"
-                value="{{ sel.precio if sel.precio is not none else '' }}" {% if modo=="nuevo" %}required{% else
-                %}readonly{% endif %}>
+                data-editable="{{ 1 if modo in ('nuevo', 'editar') else 0 }}"
+                value="{{ sel.precio if sel.precio is not none else '' }}" {% if modo not in ("nuevo", "editar" ) or
+                es_int %}readonly{% endif %} {% if modo in ("nuevo", "editar" ) and not es_int %}required{% endif %}>
+
             </div>
           </div>
 
           <!-- Precio US -->
           <div class="f c2">
             <label>Precio US</label>
+
             <input class="num" name="precio_us" id="precio_us" type="number" step="any" min="0"
-              value="{{ sel.us if sel.us is not none else '' }}" {% if modo !="nuevo" %}readonly{% endif %}>
+              value="{{ sel.us if sel.us is not none else '' }}" {% if modo not in ("nuevo", "editar" ) or not es_int
+              %}readonly{% endif %} {% if modo in ("nuevo", "editar" ) and es_int %}required{% endif %}>
+
           </div>
 
           <!-- Bodega destino -->
@@ -419,11 +425,11 @@
           title="{{ 'Solo pedidos en estado Pendiente' if modo == 'consulta' and numero else 'Primero cree el pedido' }}">+</button>
         {% endif %}
 
-        {# ✎ : editar la línea seleccionada #}
-        <button class="btn" type="button" id="btn-editar" aria-label="Editar línea"
-          title="{{ 'Editar la línea seleccionada' if puede_editar else motivo }}" {% if not puede_editar %}disabled{%
-          endif %}>
-          <img src="/static/css/img/editar.png" alt="Eliminar" class="icono-btn"></button>
+        {% if modo == "consulta" %}
+        <button class="btn" type="button" id="btn-editar" title="Editar producto seleccionado" aria-label="Editar">
+          <img src="/static/css/img/editar.png" alt="Eliminar" class="icono-btn">
+        </button>
+        {% endif %}
 
         {# 🗑 : eliminar la línea seleccionada #}
         {% if puede_editar %}
@@ -602,6 +608,30 @@
     });
   </script>
   {% endif %}
+  <script>
+    (() => {
+      const precio = document.getElementById('precio');
+      const precioUs = document.getElementById('precio_us');
+      if (!precio || !precioUs || precio.dataset.editable !== '1') return;
+
+      function aplicar(limpiar) {
+        const marcado = document.querySelector('input[name="tipo_pedido"]:checked');
+        const esInt = !!marcado && marcado.value === 'internacional';
+
+        precio.readOnly = esInt;
+        precio.required = !esInt;
+        precioUs.readOnly = !esInt;
+        precioUs.required = esInt;
+
+        if (limpiar) (esInt ? precio : precioUs).value = '';
+      }
+
+      document.querySelectorAll('input[name="tipo_pedido"]')
+        .forEach(r => r.addEventListener('change', () => aplicar(true)));
+
+      aplicar(false);
+    })();
+  </script>
 </body>
 
 </html>
