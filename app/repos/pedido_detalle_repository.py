@@ -168,56 +168,63 @@ class PedidoDetalleRepository:
 
         return resultado.first() is not None
     
-    def registrar_variacion_precio(self, datos_precio: dict) -> int:
-        """
-        Registra una variación de precio en vrcnes_prvdor.
+    def _precio_historico(self, codigo_proveedor: int, codigo_plu: int) -> float:
+        """Último precio registrado para proveedor + producto. 0 si no hay."""
 
-        Reglas de negocio:
-        1. Consulta el último precio del proveedor y PLU.
-        2. Si el precio histórico es mayor que cero,
-           compara contra el precio nuevo.
-        3. Si son diferentes, inserta un nuevo registro.
-        4. Si no existe precio histórico positivo o los
-           precios son iguales, no inserta.
+        # OPCIÓN A: usar tu función existente (descomenta una según donde esté)
+        # from app.repos.proveedores_repository import precio_proveedor      # función suelta
+        # return float(precio_proveedor(self.connection, codigo_proveedor, codigo_plu) or 0)
+        #
+        # from app.repos.catalogos_repository import CatalogosRepository     # método de otra clase
+        # return float(CatalogosRepository.precio_proveedor(codigo_proveedor, codigo_plu) or 0)
 
-        No administra transacciones.
-        Retorna 1 si insertó y 0 si no insertó.
-        """
-
-        # 1. Consultar el último precio histórico
-        sql_consulta = text("""
+        # OPCIÓN B: consulta propia, en la misma transacción (activa por ahora)
+        sql = text("""
             SELECT TOP 1 prcio_cmpra
             FROM vrcnes_prvdor
-            WHERE idntfccion = :codigo_proveedor
-              AND cdgo_plu = :codigo_plu
-              AND fcha_incia <= :fecha_actual
-            ORDER BY fcha_incia DESC
+            WHERE idntfccion = :proveedor
+              AND cdgo_plu = :plu
+            ORDER BY fcha_incia DESC, fcha_rprte DESC
         """)
+        valor = self.connection.execute(
+            sql, {"proveedor": codigo_proveedor, "plu": codigo_plu}
+        ).scalar()
+        return float(valor or 0)
+    
+    def registrar_variacion_precio(
+        self,
+        codigo_proveedor: int,
+        codigo_plu: int,
+        precio: float,
+        fecha_pedido,
+        fecha_servidor,
+        operador: str,
+        estado: int = 1,   # CONFIRMAR: valor de estdo para un precio vigente
+    ) -> bool:
+        """
+        Registra en vrcnes_prvdor el cambio de precio de un producto de un proveedor.
 
-        parametros_consulta = {
-            "codigo_proveedor": datos_precio["codigo_proveedor"],
-            "codigo_plu": datos_precio["codigo_plu"],
-            "fecha_actual": datos_precio["fecha_actual"],
-        }
+        Solo inserta si el último precio histórico es > 0 y distinto del nuevo.
+        Usa la misma conexión (transacción) del repositorio.
+        Retorna True si insertó un registro, False si no hubo nada que registrar.
+        """
 
-        resultado = self.connection.execute(
-            sql_consulta,
-            parametros_consulta
-        ).scalar_one_or_none()
+        precio_nuevo = float(precio)
 
-        # 2. Validar que exista un precio histórico positivo
-        if resultado is None or resultado <= 0:
-            return 0
+        # CONFIRMAR: firma de precio_proveedor(). Si es una función del módulo
+        # que recibe la conexión, usa: precio_proveedor(self.connection, ...)
+        precio_historico = self._precio_historico(codigo_proveedor, codigo_plu)
+        
+        print(f"el precio historico obtenido es :{precio_historico}")
+        # Sin histórico válido: se conserva el comportamiento actual.
+        if precio_historico <= 0:
+            return False
 
-        precio_anterior = resultado
-        precio_nuevo = datos_precio["precio"]
+        # Mismo precio: no hay variación que registrar.
+        if round(precio_historico, 4) == round(precio_nuevo, 4):
+            return False
 
-        # 3. Comparar el precio histórico con el nuevo
-        if precio_anterior == precio_nuevo:
-            return 0
-
-        # 4. Insertar la variación de precio
-        sql_insert = text("""
+        sql = text("""
             INSERT INTO vrcnes_prvdor (
                 idntfccion,
                 cdgo_plu,
@@ -228,28 +235,24 @@ class PedidoDetalleRepository:
                 oprdor
             )
             VALUES (
-                :codigo_proveedor,
-                :codigo_plu,
-                :fecha_pedido,
+                :proveedor,
+                :plu,
+                :fecha_inicia,
                 :precio,
-                2,
+                :estado,
                 :fecha_reporte,
                 :operador
             )
         """)
 
-        parametros_insert = {
-            "codigo_proveedor": datos_precio["codigo_proveedor"],
-            "codigo_plu": datos_precio["codigo_plu"],
-            "fecha_pedido": datos_precio["fecha_pedido"],
+        resultado = self.connection.execute(sql, {
+            "proveedor": codigo_proveedor,
+            "plu": codigo_plu,
+            "fecha_inicia": fecha_pedido,
             "precio": precio_nuevo,
-            "fecha_reporte": datos_precio["fecha_reporte"],
-            "operador": f"{datos_precio['usuario']} - {nombre_equipo}",
-        }
+            "estado": estado,
+            "fecha_reporte": fecha_servidor,
+            "operador": operador,
+        })
 
-        resultado_insert = self.connection.execute(
-            sql_insert,
-            parametros_insert
-        )
-
-        return resultado_insert.rowcount
+        return resultado.rowcount == 1
