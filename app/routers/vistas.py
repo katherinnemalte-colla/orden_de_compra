@@ -22,13 +22,13 @@ from app.services.pedidos_service import PedidoService,ProductoDuplicado
 CAMPOS = {
     "numero_pedido": "Pedido No",
     "estado": "Estado",
+    "fecha_pactada": "Fecha Pactada"
 }
 ESTADOS_OPCIONES = list(ESTADOS_GRUPOS)      # ["SIN RECIBIR", "RECIBIDO", "ANULADO"]
 router = APIRouter(include_in_schema=False)
 
 logger = logging.getLogger(__name__)
 IVA = 0.19  # ajustar al IVA real
-CAMPOS = {"numero_pedido": "Pedido No","estado": "Estado",}
 MSG_VACIO = "No se encontró información para mostrar."
 
 
@@ -67,10 +67,10 @@ MENSAJES_OK = {
 
 # ============================================================ contexto
 def _contexto(modo: str = "consulta", campo: str = "numero_pedido", valor: str = "",
-              mensaje: str | None = None) -> dict:
+              mensaje: str | None = None, valor2: str = "") -> dict:
     return {
         "modo": modo, "editable": modo in ("nuevo", "editar"),
-        "campos": CAMPOS, "campo": campo, "valor": valor, "mensaje": mensaje,
+        "campos": CAMPOS, "campo": campo, "valor": valor, "valor2": valor2, "mensaje": mensaje,
         "cat": {}, "c": {}, "sel": {}, "lineas": [], "bars": [], "steps": [],
         "cost": 0, "total_iva": 0, "margin": 0, "contador": "",
         "pedido": None, "puede_agregar": False,"estados_opciones": ESTADOS_OPCIONES,
@@ -153,17 +153,34 @@ def contexto_consulta(
     valor: str,
     i: int | None,
     l: int,
-    modo: str = "consulta"
+    modo: str = "consulta",
+    valor2: str = "",  
 ) -> dict:
     """Busca, navega y carga un pedido. Sirve igual para consulta y edición."""
 
     campo = campo if campo in CAMPOS else "numero_pedido"
     valor = valor.strip()
-
+    valor2 = valor2.strip()
+    
     if campo == "estado":
         if valor and valor not in ESTADOS_GRUPOS:
             return _contexto(modo, campo, "", "Estado no válido.")
         filtros = {"estados": ESTADOS_GRUPOS[valor]} if valor else {}
+        
+    elif campo == "fecha_pactada":         # <-- bloque nuevo
+        try:
+            desde = date.fromisoformat(valor) if valor else None
+            hasta = date.fromisoformat(valor2) if valor2 else None
+        except ValueError:
+            return _contexto(modo, campo, valor, "Fecha no válida.", valor2)
+        if desde and hasta and hasta < desde:
+            return _contexto(modo, campo, valor, "'Hasta' no puede ser menor que 'Desde'.", valor2)
+        filtros = {}
+        if desde:
+            filtros["fecha_pactada_desde"] = desde
+        if hasta:
+            filtros["fecha_pactada_hasta"] = hasta
+
     else:
         if valor and not valor.isdigit():
             return _contexto(modo, campo, valor, "Ingresa solo números.")
@@ -172,7 +189,7 @@ def contexto_consulta(
     numeros = pedidos_repository.buscar_numeros(**filtros)
 
     if not numeros:
-        return _contexto(modo, campo, valor, MSG_VACIO)
+        return _contexto(modo, campo, valor, MSG_VACIO, valor2)
 
     idx = i if i is not None else (0 if valor else len(numeros) - 1)
     idx = max(0, min(len(numeros) - 1, idx))
@@ -180,7 +197,7 @@ def contexto_consulta(
     datos = pedidos_repository.cargar_pedido(numeros[idx])
 
     if datos is None:
-        return _contexto(modo, campo, valor, MSG_VACIO)
+        return _contexto(modo, campo, valor, MSG_VACIO, valor2)
 
     cab, filas = datos["cabecera"], datos["lineas"]
 
@@ -188,6 +205,7 @@ def contexto_consulta(
         return "/?" + urlencode({
             "campo": campo,
             "valor": valor,
+            "valor2": valor2,
             **kw
         })
 
@@ -202,7 +220,7 @@ def contexto_consulta(
     ctx = _contexto(
         modo,
         campo,
-        str(cab["nmro_pddo"]) if campo == "numero_pedido" else valor
+        str(cab["nmro_pddo"]) if campo == "numero_pedido" else valor, valor2=valor2,                                              
     )
 
     ctx.update({
@@ -301,7 +319,12 @@ def _agregar_con_error(request: Request, pedido: int, texto: str, codigo: int,
     return templates.TemplateResponse(
         request, "solicitud_compra.html", ctx, status_code=codigo
     )
-
+    
+@router.get("/", response_class=HTMLResponse)
+def inicio(request: Request, campo: str = "numero_pedido", valor: str = "",
+           valor2: str = "",
+           i: int | None = None, l: int = 0):
+    return _pagina(request, contexto_consulta(campo, valor, i, l, valor2=valor2))
 
 @router.post("/nuevo/{pedido}/lineas", response_class=HTMLResponse)
 def agregar_linea(
@@ -590,9 +613,3 @@ def eliminar_detalle(
 
     # 303: la consulta se recarga y la grilla y el gráfico quedan actualizados
     return RedirectResponse(f"/?valor={numero_pedido}", status_code=303)
-
-
-@router.get("/", response_class=HTMLResponse)
-def inicio(request: Request, campo: str = "numero_pedido", valor: str = "",
-           i: int | None = None, l: int = 0):
-    return _pagina(request, contexto_consulta(campo, valor, i, l))

@@ -31,8 +31,9 @@
         <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.first }}" aria-label="Primero">⏮</a>
         <a class="btn{{ ' dis' if nav.ini }}" href="{{ nav.prev }}" aria-label="Anterior">◀</a>
 
-        <input class="btn num" id="valor-txt" name="valor" value="{{ valor }}" inputmode="numeric"
-          aria-label="Valor a buscar" {% if campo=="estado" %}hidden disabled{% endif %}>
+        <input class="btn num" id="valor-txt" name="valor"
+          value="{{ valor if campo not in ('estado', 'fecha_pactada') else '' }}" inputmode="numeric"
+          aria-label="Valor a buscar" {% if campo in ("estado", "fecha_pactada" ) %}hidden disabled{% endif %}>
 
         <select class="btn" id="valor-est" name="valor" aria-label="Estado" {% if campo !="estado" %}hidden disabled{%
           endif %}>
@@ -42,15 +43,51 @@
           {% endfor %}
         </select>
 
+        <!-- Rango de fechas -->
+        <span id="valor-rango" {% if campo !="fecha_pactada" %}hidden{% endif %}>
+          <input class="btn" type="date" id="fecha-desde" name="valor"
+            value="{{ valor if campo == 'fecha_pactada' else '' }}" aria-label="Fecha desde" {% if campo
+            !="fecha_pactada" %}disabled{% endif %}>
+          <span> → </span>
+          <input class="btn" type="date" id="fecha-hasta" name="valor2"
+            value="{{ valor2 if campo == 'fecha_pactada' else '' }}" aria-label="Fecha hasta" {% if campo
+            !="fecha_pactada" %}disabled{% endif %}>
+        </span>
+
         <script>
-          const selCampo = document.querySelector('select[name="campo"]');
-          const txt = document.getElementById('valor-txt');
-          const est = document.getElementById('valor-est');
-          selCampo.addEventListener('change', () => {
-            const esEstado = selCampo.value === 'estado';
-            txt.hidden = txt.disabled = esEstado;
-            est.hidden = est.disabled = !esEstado;
-          });
+          (() => {
+            const selCampo = document.querySelector('select[name="campo"]');
+            const txt = document.getElementById('valor-txt');
+            const est = document.getElementById('valor-est');
+            const rango = document.getElementById('valor-rango');
+            const desde = document.getElementById('fecha-desde');
+            const hasta = document.getElementById('fecha-hasta');
+
+            const activar = (el, on) => {
+              el.hidden = !on;
+              if (el === rango) {
+                desde.disabled = hasta.disabled = !on;
+              } else {
+                el.disabled = !on;
+              }
+            };
+
+            // "Hasta" no puede ser menor que "Desde"
+            desde.addEventListener('change', () => {
+              hasta.min = desde.value;
+              if (hasta.value && hasta.value < desde.value) hasta.value = desde.value;
+            });
+            hasta.addEventListener('change', () => {
+              desde.max = hasta.value;
+            });
+
+            selCampo.addEventListener('change', () => {
+              const c = selCampo.value;
+              activar(txt, c !== 'estado' && c !== 'fecha_pactada');
+              activar(est, c === 'estado');
+              activar(rango, c === 'fecha_pactada');
+            });
+          })();
         </script>
 
         <button class="btn" type="submit" aria-label="Buscar">🔍</button>

@@ -41,6 +41,8 @@ def buscar_numeros(
     lote_int: int | None = None,
     orden_compra: int | None = None,
     estados: tuple[int, ...] | None = None,
+    fecha_pactada_desde: date | None = None,
+    fecha_pactada_hasta: date | None = None,
 ) -> list[int]:
     """Lista de números de pedido que cumplen los filtros (para el navegador)."""
     where = ["1=1"]
@@ -71,7 +73,14 @@ def buscar_numeros(
             nombres.append(f":est{n}")    # 3. agrega ":est0", ":est1", ":est2"
             params[f"est{n}"] = e         # 4. guarda el valor real: est0=0, est1=1, est2=2
         where.append(f"estdo IN ({', '.join(nombres)})")
-    
+    if fecha_pactada_desde:
+        where.append("fcha_pctda >= :fpac_desde")
+        params["fpac_desde"] = fecha_pactada_desde
+    if fecha_pactada_hasta:
+        # < día siguiente: incluye completo el día "hasta", aunque la columna tenga hora
+        where.append("fcha_pctda < :fpac_hasta")
+        params["fpac_hasta"] = fecha_pactada_hasta + timedelta(days=1)
+        
     sql = (
         "SELECT nmro_pddo FROM pddos_prvdor WHERE "
         + " AND ".join(where)
